@@ -1,0 +1,144 @@
+# 數據處理配置文件
+
+# 類別映射
+categories:
+  Whiskey:
+    - Blended Malt
+    - Tennessee
+    - Peated Single Malt
+    - Single Grain
+    - Blended
+    - Flavored Whiskey
+    - Corn
+    - American Single Malt
+    - Blended Grain
+    - Blended American Whiskey
+    - Rye
+    - Bourbon
+    - Other Whiskey
+    - Single Malt
+    - Wheat Whiskey
+    - White
+    - Peated Blend
+    - Peated Blended Malt
+    - Spirit
+    - Single Pot Still
+    - Canadian
+
+  Brandy:
+    - Eau-de-Vie
+    - Other Brandy
+    - Grappa/Marc
+    - Cognac
+    - Armagnac
+    - Calvados
+    - Blanche Armagnac
+    - American Brandy
+    - Pisco
+
+  Rum:
+    - Rhum Agricole Éléve Sous Bois
+    - Spiced Rum
+    - Gold Rum
+    - Aged Rum
+    - Aguardiente
+    - Flavored Rum
+    - Navy Rum
+    - Rhum Agricole Blanc
+    - Cachaça
+    - Dark Rum
+    - Silver Rum
+    - Rhum Agricole Vieux
+    - Other Sugarcane
+
+  Gin:
+    - Distilled Gin
+    - Flavored Gin
+    - Old Tom Gin
+    - Plymouth Gin
+    - London Dry Gin
+    - Navy-Strength Gin
+    - Gin de Mahón
+    - Compound Gin
+    - Genever
+    - Modern Gin
+    - Genever-Style
+    - Barrel-Aged Gin
+
+  Vodka:
+    - Unflavored Vodka
+    - Flavored Vodka
+
+  Tequila:
+    - Tequila Añejo
+    - Tequila Blanco
+    - Tequila Mixto Blanco
+    - Tequila Joven
+    - Tequila Extra Añejo
+    - Mezcal Joven
+    - Raicilla
+    - Tequila Mixto Gold
+    - Mezcal Reposado
+    - Other Agave
+    - Sotol Blanco
+    - Tequila Reposado
+    - Sotol Añejo
+    - Mezcal Añejo
+
+  Liqueurs/Bitters:
+    - Bitter Liqueurs
+    - Sloe Gin & Variants
+    - Chocolate Liqueurs
+    - Other Liqueurs
+    - Herbal/Spice Liqueurs
+    - Coffee Liqueurs
+    - Amaro
+    - Triple Sec/Curaçao
+    - Fruit Liqueurs
+    - Nut Liqueurs
+    - Floral Liqueurs
+    - Dairy/Egg Liqueurs
+
+# 風味標籤
+flavor_labels:
+  - briny
+  - chemical
+  - bitter
+  - juniper
+  - hogo
+  - nutty
+  - umami
+  - neutral
+  - rancio
+  - roast
+  - mineral
+  - grain
+  - harsh
+  - earthy
+  - woody
+  - floral
+  - fruity
+  - full_bodied
+  - herbal
+  - oily
+  - peaty
+  - rich
+  - salty
+  - smoky
+  - spicy
+  - sweet
+  - tart
+  - vanilla
+
+# 風味編碼配置
+flavor_encoding:
+  scale_factor: 20  # 將 0-100 轉換為 0-5 的比例因子
+  max_level: 5      # 最大等級
+  num_levels: 6     # 總等級數（0-5）
+
+# 數據路徑
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  train_data: "data/processed/train_data.csv"
+  test_data: "data/processed/test_data.csv"

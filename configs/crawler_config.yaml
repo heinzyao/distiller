@@ -1,0 +1,38 @@
+# 爬蟲配置文件
+
+# HTTP 請求配置
+request:
+  timeout: 30  # 請求超時時間（秒）
+  delay: 3     # 請求間隔（秒）
+  max_retries: 3  # 最大重試次數
+  backoff_factor: 2  # 退避因子（指數退避）
+
+# 多線程配置
+threading:
+  num_threads: 10  # 線程數量
+  queue_size: 1000  # 隊列大小
+
+# 爬取目標配置
+target:
+  base_url: "https://distiller.com"
+  search_url: "https://distiller.com/search?official_status=official"
+  items_per_page: 50
+
+# User-Agent 配置
+headers:
+  User-Agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36"
+  Connection: "keep-alive"
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8"
+  Accept-Language: "en-US,en;q=0.8"
+
+# 日誌配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/crawler.log"
+
+# 輸出配置
+output:
+  format: "csv"  # csv 或 json
+  directory: "data/raw"
+  filename_template: "distiller_products_{timestamp}"
