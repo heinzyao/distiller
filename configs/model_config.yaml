@@ -1,0 +1,89 @@
+# 模型訓練配置文件
+
+# 模型選擇
+model:
+  type: "xlnet"  # xlnet, distilbert, roberta, bert
+  pretrained_models:
+    xlnet: "xlnet-base-cased"
+    distilbert: "distilbert-base-uncased"
+    roberta: "distilroberta-base"
+    bert: "bert-base-uncased"
+
+# 訓練參數
+training:
+  # 基本參數
+  num_train_epochs: 2
+  train_batch_size: 8
+  eval_batch_size: 8
+  gradient_accumulation_steps: 1
+
+  # 學習率配置
+  learning_rate: 3e-5
+  warmup_ratio: 0.1
+  warmup_steps: 0
+
+  # 序列配置
+  max_seq_length: 256
+  do_lower_case: false
+
+  # 優化器配置
+  optimizer: "AdamW"
+  adam_epsilon: 1e-8
+  max_grad_norm: 1.0
+  weight_decay: 0.01
+
+  # 評估配置
+  evaluate_during_training: true
+  evaluate_during_training_steps: 100
+  evaluate_during_training_verbose: true
+  logging_steps: 50
+
+  # 保存配置
+  save_steps: 500
+  save_model_every_epoch: true
+  save_eval_checkpoints: false
+  save_optimizer_and_scheduler: true
+
+  # 其他配置
+  overwrite_output_dir: true
+  reprocess_input_data: true
+  use_multiprocessing: false
+  use_multiprocessing_for_evaluation: false
+  fp16: true  # 混合精度訓練（需要 GPU）
+  fp16_opt_level: "O1"
+  manual_seed: 42
+  use_early_stopping: true
+  early_stopping_patience: 3
+  early_stopping_delta: 0.001
+
+# 數據分割
+data_split:
+  test_size: 0.2
+  random_state: 42
+  stratify: false
+
+# 輸出配置
+output:
+  directory: "data/models"
+  tensorboard_dir: "runs"
+  best_model_dir: "best_model"
+
+# 評估指標
+metrics:
+  - f1
+  - precision
+  - recall
+  - lrap  # Label Ranking Average Precision
+  - hamming_loss
+
+# 預測配置
+prediction:
+  threshold: 0.5  # 二元分類閾值
+  batch_size: 32
+
+# MLflow 配置（實驗追蹤）
+mlflow:
+  enabled: false
+  tracking_uri: "mlruns"
+  experiment_name: "distiller_flavor_prediction"
+  run_name_template: "{model_type}_{timestamp}"
