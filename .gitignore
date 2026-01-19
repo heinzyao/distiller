@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+.venv*/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+distiller_*_scraper.log
+
+# Generated outputs
+distiller_spirits_reviews_NEW.csv
+distiller_phase1_test.csv
+distiller_phase2_test.csv
+distiller_selenium_phase1.csv
+scraper_output.txt
