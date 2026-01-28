@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 *.egg-info/
+venv/
 .venv/
 .venv*/
 .env
@@ -16,11 +17,7 @@ __pycache__/
 
 # Logs
 *.log
-distiller_*_scraper.log
 
-# Generated outputs
-distiller_spirits_reviews_NEW.csv
-distiller_phase1_test.csv
-distiller_phase2_test.csv
-distiller_selenium_phase1.csv
-scraper_output.txt
+# Data outputs (keep only versioned/released data)
+distiller_spirits_*.csv
+!distiller_spirits_reviews.csv

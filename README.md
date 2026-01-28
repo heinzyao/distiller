@@ -1,37 +1,73 @@
 # Distiller
 
-Distiller 是一個用來爬取 Distiller.com 烈酒資料的專案，包含原始爬蟲、改進版 Selenium 爬蟲與測試報告。
+從 [Distiller.com](https://distiller.com) 爬取烈酒評論資料的 Python 爬蟲專案。
+
+## 功能特點
+
+- ✅ 支援 Whiskey、Gin、Rum、Vodka 等多類別爬取
+- ✅ 提取完整資料：評分、風味圖譜、品飲筆記等
+- ✅ Headless Chrome 模式，穩定高效
+- ✅ 智能延遲與速率控制
 
 ## 專案結構
 
-- `dev.py`: 原始 Selenium 爬蟲（Edge 版本，Windows 參考）
-- `dev.ipynb`: requests 版本的探索性 Notebook
-- `distiller_selenium_scraper.py`: Selenium 爬蟲框架（Chrome 相容）
-- `run_final_scraper.py`: 中等規模爬蟲（headless Chrome）
-- `distiller_scraper_improved.py`: requests 改進版（僅供參考）
-- `distiller_spirits_reviews.csv`: 既有資料集
-- `TESTING_REPORT.md`: 測試報告
+```
+Distiller/
+├── distiller_scraper/      # 核心爬蟲模組
+│   ├── scraper.py          # 主爬蟲類別
+│   ├── selectors.py        # CSS 選擇器
+│   └── config.py           # 爬蟲配置
+├── run.py                  # 執行入口
+├── requirements.txt
+├── AGENTS.md               # 多代理協作紀錄
+└── CHANGELOG.md            # 變更紀錄
+```
 
 ## 安裝
 
 ```bash
+# 建立虛擬環境
+python3 -m venv venv
+source venv/bin/activate
+
+# 安裝依賴
 pip install -r requirements.txt
-pip install selenium webdriver-manager beautifulsoup4
 ```
 
-## 執行爬蟲
+## 執行
 
 ```bash
-python3 run_final_scraper.py
+# 測試模式 (少量)
+python run.py --test
+
+# 中等規模
+python run.py --medium
+
+# 完整爬取
+python run.py --full
 ```
 
-輸出：`distiller_spirits_reviews_NEW.csv`
+## 資料欄位
 
-## 測試說明
+| 欄位 | 說明 |
+|------|------|
+| `name` | 品名 |
+| `spirit_type` | 類型 (Single Malt, Bourbon 等) |
+| `brand`, `country` | 品牌與產地 |
+| `age`, `abv` | 年份與酒精濃度 |
+| `expert_score`, `community_score` | 專家/社群評分 |
+| `flavor_data` | 風味圖譜 (JSON) |
+| `description`, `tasting_notes` | 描述與品飲筆記 |
 
-完整測試與分析請參考 `TESTING_REPORT.md`。
+## 協作說明
+
+本專案由多個 AI 代理協作開發，詳見 [AGENTS.md](AGENTS.md)。
 
 ## 注意事項
 
-- Distiller.com 使用 JavaScript 動態載入，requests 版本無法獲取完整資料。
-- 若要擴大爬取範圍，需進一步研究分頁或 API。
+- Distiller.com 使用 JavaScript 動態載入，需使用 Selenium
+- 請遵守網站使用條款，合理控制爬取頻率
+
+## License
+
+MIT
