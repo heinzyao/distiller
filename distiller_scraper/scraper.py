@@ -14,17 +14,10 @@ import logging
 import random
 import time
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 import pandas as pd
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
 
 from .config import ScraperConfig
 from .selectors import DataExtractor, Selectors
@@ -53,7 +46,7 @@ class DistillerScraperV2:
         self.headless = headless
         self.delay_min = delay_min
         self.delay_max = delay_max
-        self.driver: Optional[webdriver.Chrome] = None
+        self.driver: Optional[Any] = None  # webdriver.Chrome, 延遲導入
         self.spirits_data: List[Dict] = []
         self.failed_urls: List[str] = []
         self.seen_urls: Set[str] = set()  # 去重用
@@ -61,6 +54,12 @@ class DistillerScraperV2:
     def start_driver(self) -> bool:
         """啟動 Chrome WebDriver"""
         try:
+            # 延遲導入 selenium 相關模組以加速模組載入
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options as ChromeOptions
+            from selenium.webdriver.chrome.service import Service as ChromeService
+            from webdriver_manager.chrome import ChromeDriverManager
+
             logger.info("正在啟動 Chrome WebDriver...")
             options = ChromeOptions()
 

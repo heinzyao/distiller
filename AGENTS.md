@@ -19,6 +19,49 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-01-28 | OpenCode Agent
+
+**工作內容**：
+1. 實作完整自動化測試框架 (pytest)
+2. 建立測試目錄結構與 fixtures
+3. 撰寫單元測試 (30+ 測試案例)
+   - `test_selectors.py`: DataExtractor 各方法測試
+   - `test_url_builder.py`: SearchURLBuilder 測試
+   - `test_config.py`: ScraperConfig 驗證測試
+4. 撰寫整合測試 (Mock-based)
+   - `test_scraper_mock.py`: 使用 Mock HTML 測試爬蟲流程
+5. 撰寫端到端測試
+   - `test_scraper_live.py`: 實際連線測試（標記為 slow/network）
+6. 建立 GitHub Actions CI/CD workflow
+7. 更新專案紀錄
+
+**主要變更**：
+- 新增 `tests/` 目錄（6 個測試模組）
+- 新增 `pytest.ini` 配置
+- 新增 `.github/workflows/test.yml` CI/CD
+- 更新 `requirements.txt`（加入 pytest）
+- 更新 `CHANGELOG.md`, `AGENTS.md`
+
+**測試執行方式**：
+```bash
+# 執行單元測試與整合測試（預設，快速）
+pytest
+
+# 執行所有測試（包含 E2E，較慢）
+pytest -m ""
+
+# 只執行單元測試
+pytest tests/unit
+
+# 只執行整合測試
+pytest tests/integration
+
+# 執行 E2E 測試（需要網路）
+pytest tests/e2e -m "slow or network"
+```
+
+---
+
 ### 2026-01-27 ~ 2026-01-28 | Antigravity Agent
 
 **工作內容**：
@@ -143,11 +186,11 @@ python run.py
 
 ## 📝 待辦事項
 
-- [ ] 加入自動化測試 (pytest)
+- [x] 加入自動化測試 (pytest) ✅ 2026-01-28
 - [ ] 實作分頁爬取以擴大資料量
 - [ ] 探索 API 端點提高效率
 - [ ] 加入資料庫儲存支援
 
 ---
 
-*最後更新：2026-01-28 by Antigravity Agent*
+*最後更新：2026-01-28 by OpenCode Agent*
