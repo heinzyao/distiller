@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2026-02-27
+
+### Added
+- **SQLite storage backend** (`distiller_scraper/storage.py`)
+  - `StorageBackend` abstract base class for pluggable storage
+  - `SQLiteStorage` with WAL mode, `spirits` + `flavor_profiles` + `scrape_runs` tables
+  - `CSVStorage` wrapper for backward-compatible CSV output
+  - Upsert support with duplicate URL detection
+- **Paginated scraping** for higher data volume
+  - `SearchURLBuilder.build_search_url()` now accepts `page` parameter
+  - New scraper methods: `_get_search_queries()`, `_fetch_spirit_urls_from_page()`, `scrape_category_paginated()`
+  - Smart stop conditions: empty page / low new URL count / high duplicate ratio
+  - Pagination constants in `config.py` (`MAX_PAGES_PER_QUERY`, `DUPLICATE_RATIO_THRESHOLD`, etc.)
+- **API endpoint discovery** (`distiller_scraper/api_client.py`)
+  - `DistillerAPIClient` with dual discovery: Chrome XHR capture + candidate path probing
+  - Three-tier fallback: API (fast) → Selenium (reliable) for both search and detail
+  - `discover_api()` auto-probes before scraping starts
+- **New CLI flags**: `--output csv|sqlite|both`, `--db-path`, `--no-pagination`, `--use-api`
+- **98 new tests** (total: 192)
+  - `tests/unit/test_storage.py` (30 tests)
+  - `tests/unit/test_api_client.py` (42 tests)
+  - `tests/integration/test_pagination.py` (22 tests)
+  - 4 pagination tests added to `tests/unit/test_url_builder.py`
+
+### Changed
+- `DistillerScraperV2` accepts `storage` and `api_client` parameters
+- `scrape()` and `scrape_category()` accept `use_pagination` parameter
+- Chrome options include Performance Logging for XHR capture
+- Version bumped to 2.2.0
+
+### Fixed
+- Python 3.12 sqlite3 `cursor.lastrowid` returning wrong value after `ON CONFLICT DO UPDATE`; replaced with explicit SELECT → INSERT/UPDATE flow
+
 ## [1.1.1] - 2026-01-28
 
 ### Fixed
