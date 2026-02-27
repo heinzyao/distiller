@@ -150,7 +150,7 @@ pytest tests/e2e -m "slow or network"
 **接手指南**：
 ```bash
 # 專案根目錄
-cd /Users/Henry/Desktop/Project/Distiller
+cd /Users/Henry/Project/Distiller
 
 # 啟用虛擬環境
 source venv/bin/activate
@@ -158,11 +158,11 @@ source venv/bin/activate
 # 安裝依賴
 pip install -r requirements.txt
 
-# 執行爬蟲 (測試模式)
-python run.py --test
+# 執行爬蟲（測試模式）
+python run.py --mode test
 
-# 執行爬蟲 (完整模式)
-python run.py
+# 執行爬蟲（完整模式）
+python run.py --mode full
 ```
 
 **核心檔案說明**：

@@ -179,6 +179,6 @@ SQLite schema 包含：
 - 請遵守網站使用條款，合理控制爬取頻率
 - 需要 Chrome 瀏覽器（webdriver-manager 會自動管理 ChromeDriver）
 
-## License
+## 授權條款
 
 MIT
