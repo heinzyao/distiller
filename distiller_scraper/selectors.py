@@ -245,6 +245,7 @@ class SearchURLBuilder:
         cost_bracket: str = None,
         sort: str = "distiller_score",
         term: str = None,
+        page: int = None,
     ) -> str:
         """構建搜索 URL"""
         params = []
@@ -261,6 +262,8 @@ class SearchURLBuilder:
             params.append(f"sort={sort}")
         if term:
             params.append(f"term={term}")
+        if page is not None and page > 1:
+            params.append(f"page={page}")
 
         if params:
             return f"{cls.SEARCH_URL}?{'&'.join(params)}"

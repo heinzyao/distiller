@@ -92,6 +92,32 @@ class TestSearchURLBuilder:
         )
         assert "sort" not in result
 
+    def test_build_search_url_page_1_omitted(self):
+        """page=1 不應出現在 URL 中（避免影響部分網站）"""
+        result = SearchURLBuilder.build_search_url(category="whiskey", page=1)
+        assert "page=" not in result
+
+    def test_build_search_url_page_2(self):
+        """page=2 應正確附加"""
+        result = SearchURLBuilder.build_search_url(category="whiskey", page=2)
+        assert "page=2" in result
+
+    def test_build_search_url_page_10(self):
+        """大頁碼應正確附加"""
+        result = SearchURLBuilder.build_search_url(category="gin", page=10)
+        assert "page=10" in result
+        assert "category=gin" in result
+
+    def test_build_search_url_page_with_style(self):
+        """分頁 + 風格篩選"""
+        result = SearchURLBuilder.build_search_url(
+            category="whiskey",
+            spirit_style_id="1",
+            page=3,
+        )
+        assert "spirit_style_id=1" in result
+        assert "page=3" in result
+
 
 class TestSpiritURL:
     """測試 spirit_url 方法"""

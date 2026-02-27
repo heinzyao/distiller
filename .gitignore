@@ -21,3 +21,8 @@ venv/
 # Data outputs (keep only versioned/released data)
 distiller_spirits_*.csv
 !distiller_spirits_reviews.csv
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal

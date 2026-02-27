@@ -19,8 +19,10 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 import pandas as pd
 from bs4 import BeautifulSoup
 
+from .api_client import DistillerAPIClient
 from .config import ScraperConfig
 from .selectors import DataExtractor, Selectors
+from .storage import StorageBackend
 
 # 設定日誌
 logging.basicConfig(
@@ -42,14 +44,21 @@ class DistillerScraperV2:
         headless: bool = True,
         delay_min: float = 2,
         delay_max: float = 4,
+        storage: Optional[StorageBackend] = None,
+        api_client: Optional[DistillerAPIClient] = None,
     ):
         self.headless = headless
         self.delay_min = delay_min
         self.delay_max = delay_max
+        self.storage = storage
+        self.api_client = api_client
         self.driver: Optional[Any] = None  # webdriver.Chrome, 延遲導入
         self.spirits_data: List[Dict] = []
         self.failed_urls: List[str] = []
-        self.seen_urls: Set[str] = set()  # 去重用
+        # 去重：若有 storage 則從 DB 載入已存 URLs
+        self.seen_urls: Set[str] = (
+            storage.get_existing_urls() if storage else set()
+        )
 
     def start_driver(self) -> bool:
         """啟動 Chrome WebDriver"""
@@ -71,6 +80,9 @@ class DistillerScraperV2:
             options.add_argument("--disable-gpu")
             options.add_argument(f"--window-size={ScraperConfig.WINDOW_SIZE}")
             options.add_argument(f"user-agent={ScraperConfig.USER_AGENT}")
+
+            # 啟用 Performance Logging 以捕獲 XHR 請求（用於 API 探測）
+            options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
             service = ChromeService(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=options)
@@ -145,12 +157,262 @@ class DistillerScraperV2:
             logger.error(f"重新啟動 WebDriver 失敗: {e}")
             return False
 
+    def capture_xhr_requests(self, url: str, scroll_count: int = 3) -> List[str]:
+        """
+        瀏覽指定頁面並捕獲滾動觸發的 XHR/Fetch 請求 URL。
+        用於探測分頁 API 端點。回傳所有捕獲的請求 URL 列表。
+        """
+        import json as _json
+
+        try:
+            self.driver.get(url)
+            time.sleep(ScraperConfig.INITIAL_PAGE_DELAY)
+
+            # 清空現有 performance log
+            self.driver.get_log("performance")
+
+            # 滾動觸發可能的 XHR 請求
+            for _ in range(scroll_count):
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(ScraperConfig.SCROLL_DELAY)
+
+            # 讀取 performance log
+            logs = self.driver.get_log("performance")
+            xhr_urls = []
+
+            for entry in logs:
+                try:
+                    msg = _json.loads(entry["message"])["message"]
+                    if msg.get("method") != "Network.requestWillBeSent":
+                        continue
+                    req_url = msg.get("params", {}).get("request", {}).get("url", "")
+                    resource_type = msg.get("params", {}).get("type", "")
+                    if resource_type in ("XHR", "Fetch") and req_url:
+                        xhr_urls.append(req_url)
+                except (KeyError, ValueError):
+                    continue
+
+            return xhr_urls
+
+        except Exception as e:
+            logger.warning(f"捕獲 XHR 請求失敗: {e}")
+            return []
+
+    def _get_search_queries(
+        self, category: str, use_styles: bool
+    ) -> List[tuple]:
+        """回傳此類別要查詢的 (base_url, label) 列表"""
+        style_map = {
+            "whiskey": ScraperConfig.WHISKEY_STYLES,
+            "gin":     ScraperConfig.GIN_STYLES,
+            "rum":     ScraperConfig.RUM_STYLES,
+            "vodka":   ScraperConfig.VODKA_STYLES,
+        }
+        queries = []
+        if use_styles and category in style_map:
+            for style_id, style_name in style_map[category]:
+                url = (
+                    f"https://distiller.com/search"
+                    f"?category={category}&spirit_style_id={style_id}&sort=distiller_score"
+                )
+                queries.append((url, style_name))
+        else:
+            url = f"https://distiller.com/search?category={category}&sort=distiller_score"
+            queries.append((url, category))
+        return queries
+
+    def _fetch_spirit_urls_from_page(self, page_url: str) -> List[str]:
+        """
+        載入搜索結果頁面，完整滾動後回傳所有 spirit URL。
+        供分頁與滾動模式共用。
+        """
+        self.driver.get(page_url)
+        time.sleep(ScraperConfig.INITIAL_PAGE_DELAY)
+        self.scroll_page()
+        soup = BeautifulSoup(self.driver.page_source, "html.parser")
+        return self.extract_spirit_urls_from_list(soup)
+
+    def _fetch_spirit_urls(self, base_url: str, page: int) -> List[str]:
+        """
+        取得指定查詢 + 頁碼的 spirit URL 列表。
+        優先使用 API（快速），失敗時 fallback 至 Selenium。
+        """
+        from urllib.parse import parse_qs, urlparse
+
+        if self.api_client and self.api_client.is_available():
+            parsed = urlparse(base_url)
+            params = parse_qs(parsed.query, keep_blank_values=True)
+            category = params.get("category", [""])[0]
+            style_id = params.get("spirit_style_id", [None])[0]
+
+            urls = self.api_client.fetch_search_results(
+                category=category, page=page, spirit_style_id=style_id
+            )
+            if urls is not None:  # [] 代表本頁無結果（合法），None 代表請求異常
+                mode = "API"
+                logger.info(f"  [{mode}] 第 {page} 頁: {len(urls)} 個連結")
+                return urls
+            logger.debug("  API 請求失敗，fallback 至 Selenium")
+
+        # Selenium fallback
+        page_url = base_url if page == 1 else f"{base_url}&page={page}"
+        return self._fetch_spirit_urls_from_page(page_url)
+
+    def discover_api(self, warm_up_category: str = "whiskey") -> bool:
+        """
+        探測 Distiller.com API 端點。
+        載入一個搜索頁面並捕獲 XHR 請求，交給 api_client 分析。
+        回傳 API 是否可用。
+        若 api_client 未設定，直接回傳 False。
+        """
+        if not self.api_client:
+            return False
+
+        logger.info("=" * 60)
+        logger.info("正在探測 API 端點...")
+        warm_url = (
+            f"https://distiller.com/search"
+            f"?category={warm_up_category}&sort=distiller_score"
+        )
+        xhr_urls = self.capture_xhr_requests(warm_url, scroll_count=2)
+        logger.info(f"捕獲 {len(xhr_urls)} 個 XHR 請求")
+
+        result = self.api_client.discover(xhr_urls)
+
+        if result["available"]:
+            logger.info(f"✓ API 可用！搜索端點: {result['search_endpoint']}")
+            if result.get("detail_endpoint_template"):
+                logger.info(f"✓ 詳情端點: {result['detail_endpoint_template']}")
+        else:
+            logger.info("API 不可用，將使用 Selenium 模式")
+        logger.info("=" * 60)
+
+        return result["available"]
+
+    def _scrape_urls(
+        self,
+        spirit_urls: List[str],
+        category: str,
+        results: List[Dict],
+        max_spirits: int,
+    ) -> None:
+        """逐一爬取 spirit URL 列表，結果 append 至 results（就地修改）"""
+        for spirit_url in spirit_urls:
+            if len(results) >= max_spirits:
+                break
+            if spirit_url in self.seen_urls:
+                continue
+            logger.info(f"[{len(results) + 1}/{max_spirits}] 正在爬取詳情...")
+            spirit_data = self.scrape_spirit_detail(spirit_url)
+            if spirit_data:
+                spirit_data["category"] = category
+                results.append(spirit_data)
+            self.random_delay()
+
+    def scrape_category_paginated(
+        self,
+        category: str,
+        max_spirits: int = None,
+        use_styles: bool = False,
+    ) -> List[Dict]:
+        """
+        分頁模式爬取特定類別。
+        對每個查詢（category / style）逐頁翻頁，直到：
+          - 已達 max_spirits 上限
+          - 連續頁面無新 URL（重複比例 >= DUPLICATE_RATIO_THRESHOLD）
+          - 頁面完全無結果
+          - 達到 MAX_PAGES_PER_QUERY 上限
+        若第一頁即判斷分頁無效，自動 fallback 至滾動模式。
+        """
+        max_spirits = max_spirits or ScraperConfig.MAX_SPIRITS_PER_CATEGORY
+        results: List[Dict] = []
+        queries = self._get_search_queries(category, use_styles)
+
+        for base_url, label in queries:
+            if len(results) >= max_spirits:
+                break
+
+            logger.info(f"[分頁] 開始爬取: {label}")
+            pagination_works = False  # 確認分頁是否真的有效
+
+            for page in range(1, ScraperConfig.MAX_PAGES_PER_QUERY + 1):
+                if len(results) >= max_spirits:
+                    break
+
+                logger.info(f"  第 {page} 頁 ({'API' if self.api_client and self.api_client.is_available() else 'Selenium'})")
+
+                try:
+                    urls_on_page = self._fetch_spirit_urls(base_url, page)
+                except Exception as e:
+                    logger.error(f"  載入第 {page} 頁失敗: {e}")
+                    break
+
+                if not urls_on_page:
+                    logger.info(f"  第 {page} 頁無結果，停止分頁")
+                    break
+
+                # 計算新 URL 數量（未見過的）
+                new_urls = [u for u in urls_on_page if u not in self.seen_urls]
+                total_on_page = len(urls_on_page)
+                duplicate_ratio = 1.0 - (len(new_urls) / total_on_page)
+
+                logger.info(
+                    f"  第 {page} 頁找到 {total_on_page} 個連結，"
+                    f"新增 {len(new_urls)} 個（重複率 {duplicate_ratio:.0%}）"
+                )
+
+                # 判斷分頁是否有效（第二頁起出現新內容 = 分頁有效）
+                if page == 2 and len(new_urls) >= ScraperConfig.MIN_NEW_URLS_PER_PAGE:
+                    pagination_works = True
+                    logger.info("  分頁機制有效，繼續翻頁")
+
+                # 第二頁起若無新 URL，判斷已到結尾
+                if page >= 2 and len(new_urls) < ScraperConfig.MIN_NEW_URLS_PER_PAGE:
+                    if not pagination_works:
+                        logger.info("  分頁無效（第二頁無新內容），切換至滾動模式")
+                        # fallback: 重新以 Selenium 滾動模式爬第一頁
+                        first_page_urls = self._fetch_spirit_urls_from_page(base_url)
+                        self._scrape_urls(first_page_urls, category, results, max_spirits)
+                    else:
+                        logger.info(f"  第 {page} 頁無新 URL，分頁結束")
+                    break
+
+                # 重複率過高也停止
+                if page >= 2 and duplicate_ratio >= ScraperConfig.DUPLICATE_RATIO_THRESHOLD:
+                    logger.info(f"  重複率 {duplicate_ratio:.0%} 過高，停止分頁")
+                    break
+
+                self._scrape_urls(urls_on_page, category, results, max_spirits)
+
+                # 每頁間延遲
+                if len(results) < max_spirits:
+                    time.sleep(ScraperConfig.SCROLL_DELAY)
+
+            # 查詢間延遲（多風格時）
+            if len(queries) > 1 and len(results) < max_spirits:
+                time.sleep(ScraperConfig.CATEGORY_DELAY)
+
+        return results
+
     def scrape_spirit_detail(self, url: str, retry_count: int = 0) -> Optional[Dict]:
-        """爬取單個烈酒詳情頁"""
+        """爬取單個烈酒詳情頁（優先使用 API，失敗則 fallback Selenium）"""
         if url in self.seen_urls:
             logger.debug(f"跳過重複 URL: {url}")
             return None
 
+        # ── API 模式 ────────────────────────────────────────────────
+        if self.api_client and self.api_client.is_available():
+            api_data = self.api_client.fetch_spirit_detail(url)
+            if api_data:
+                api_data["url"] = url
+                self.seen_urls.add(url)
+                if self.storage:
+                    self.storage.save_spirit(api_data)
+                logger.info(f"✓ [API] 已爬取: {api_data['name']}")
+                return api_data
+            logger.debug(f"  API 詳情失敗，fallback Selenium: {url}")
+
+        # ── Selenium fallback ────────────────────────────────────────
         max_retries = 3
 
         try:
@@ -173,6 +435,10 @@ class DistillerScraperV2:
 
             # 標記為已處理
             self.seen_urls.add(url)
+
+            # 即時寫入 storage
+            if self.storage:
+                self.storage.save_spirit(data)
 
             logger.info(f"✓ 已爬取: {data['name']}")
             return data
@@ -199,88 +465,46 @@ class DistillerScraperV2:
         category: str,
         max_spirits: int = None,
         use_styles: bool = False,
+        use_pagination: bool = None,
     ) -> List[Dict]:
-        """爬取特定類別的烈酒"""
+        """
+        爬取特定類別的烈酒。
+        use_pagination=True（預設）：分頁模式，可爬取遠超滾動上限的資料。
+        use_pagination=False：傳統滾動模式（向後相容）。
+        """
         max_spirits = max_spirits or ScraperConfig.MAX_SPIRITS_PER_CATEGORY
-        results = []
+        if use_pagination is None:
+            use_pagination = ScraperConfig.PAGINATION_ENABLED
 
-        # 決定要使用的 URL 列表
-        urls_to_scrape = []
-
-        if use_styles and category == "whiskey":
-            # 使用風格篩選來獲取更多結果
-            for style_id, style_name in ScraperConfig.WHISKEY_STYLES:
-                search_url = f"https://distiller.com/search?category={category}&spirit_style_id={style_id}&sort=distiller_score"
-                urls_to_scrape.append((search_url, style_name))
-        elif use_styles and category == "gin":
-            for style_id, style_name in ScraperConfig.GIN_STYLES:
-                search_url = f"https://distiller.com/search?category={category}&spirit_style_id={style_id}&sort=distiller_score"
-                urls_to_scrape.append((search_url, style_name))
-        elif use_styles and category == "rum":
-            for style_id, style_name in ScraperConfig.RUM_STYLES:
-                search_url = f"https://distiller.com/search?category={category}&spirit_style_id={style_id}&sort=distiller_score"
-                urls_to_scrape.append((search_url, style_name))
-        elif use_styles and category == "vodka":
-            for style_id, style_name in ScraperConfig.VODKA_STYLES:
-                search_url = f"https://distiller.com/search?category={category}&spirit_style_id={style_id}&sort=distiller_score"
-                urls_to_scrape.append((search_url, style_name))
-        else:
-            # 基本搜索
-            search_url = (
-                f"https://distiller.com/search?category={category}&sort=distiller_score"
+        if use_pagination:
+            return self.scrape_category_paginated(
+                category, max_spirits=max_spirits, use_styles=use_styles
             )
-            urls_to_scrape.append((search_url, category))
 
-        for search_url, label in urls_to_scrape:
+        # ── 傳統滾動模式（fallback） ──────────────────────────────────────
+        results: List[Dict] = []
+        queries = self._get_search_queries(category, use_styles)
+
+        for search_url, label in queries:
             if len(results) >= max_spirits:
                 break
 
-            logger.info(f"正在爬取: {label} ({search_url})")
-
+            logger.info(f"[滾動] 正在爬取: {label} ({search_url})")
             try:
-                self.driver.get(search_url)
-                time.sleep(ScraperConfig.INITIAL_PAGE_DELAY)
-
-                # 滾動載入更多
-                self.scroll_page()
-
-                # 解析頁面
-                soup = BeautifulSoup(self.driver.page_source, "html.parser")
-                spirit_urls = self.extract_spirit_urls_from_list(soup)
-
-                logger.info(f"在 {label} 中找到 {len(spirit_urls)} 個烈酒連結")
-
-                # 爬取每個烈酒詳情
-                for i, spirit_url in enumerate(spirit_urls):
-                    if len(results) >= max_spirits:
-                        break
-
-                    if spirit_url in self.seen_urls:
-                        continue
-
-                    logger.info(f"[{len(results) + 1}/{max_spirits}] 正在爬取詳情...")
-
-                    spirit_data = self.scrape_spirit_detail(spirit_url)
-                    if spirit_data:
-                        spirit_data["category"] = category
-                        results.append(spirit_data)
-
-                    self.random_delay()
-
+                urls = self._fetch_spirit_urls_from_page(search_url)
+                logger.info(f"在 {label} 中找到 {len(urls)} 個烈酒連結")
+                self._scrape_urls(urls, category, results, max_spirits)
             except Exception as e:
                 error_msg = str(e)
-                # 檢查是否為 session 斷開錯誤
                 if "invalid session id" in error_msg or "session deleted" in error_msg:
-                    logger.warning(f"Session 斷開，嘗試重新連接...")
+                    logger.warning("Session 斷開，嘗試重新連接...")
                     if self.restart_driver():
                         time.sleep(2)
-                        # 重試當前風格
                         continue
                 logger.error(f"爬取 {label} 時發生錯誤: {e}")
                 continue
 
-            # 類別間延遲
-            if len(urls_to_scrape) > 1:
+            if len(queries) > 1:
                 time.sleep(ScraperConfig.CATEGORY_DELAY)
 
         return results
@@ -290,10 +514,13 @@ class DistillerScraperV2:
         categories: List[str] = None,
         max_per_category: int = None,
         use_styles: bool = True,
+        use_pagination: bool = None,
     ):
         """執行爬蟲"""
         categories = categories or ScraperConfig.CATEGORIES
         max_per_category = max_per_category or ScraperConfig.MAX_SPIRITS_PER_CATEGORY
+        if use_pagination is None:
+            use_pagination = ScraperConfig.PAGINATION_ENABLED
 
         start_time = datetime.now()
         logger.info(f"\n{'=' * 80}")
@@ -301,10 +528,15 @@ class DistillerScraperV2:
         logger.info(f"類別: {categories}")
         logger.info(f"每類別上限: {max_per_category}")
         logger.info(f"使用風格篩選: {use_styles}")
+        logger.info(f"分頁模式: {use_pagination}")
         logger.info(f"{'=' * 80}\n")
 
         if not self.start_driver():
             return False
+
+        # API 端點探測（若 api_client 已設定）
+        if self.api_client:
+            self.discover_api(warm_up_category=categories[0])
 
         try:
             for cat_idx, category in enumerate(categories, 1):
@@ -316,6 +548,7 @@ class DistillerScraperV2:
                     category,
                     max_spirits=max_per_category,
                     use_styles=use_styles,
+                    use_pagination=use_pagination,
                 )
                 self.spirits_data.extend(category_results)
 

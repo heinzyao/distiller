@@ -24,6 +24,14 @@ class ScraperConfig:
     MAX_SCROLL_ATTEMPTS = 15
     MAX_RETRIES = 3
 
+    # 分頁設定
+    PAGINATION_ENABLED = True       # 預設啟用分頁模式
+    MAX_PAGES_PER_QUERY = 50        # 單一查詢最多翻頁數
+    PAGE_PARAM = "page"             # URL 分頁參數名稱
+    # 停止分頁的判斷條件
+    MIN_NEW_URLS_PER_PAGE = 2       # 每頁至少需取得此數量的新 URL
+    DUPLICATE_RATIO_THRESHOLD = 0.8 # 重複 URL 比例超過此值時停止
+
     # 類別列表
     CATEGORIES = [
         "whiskey",
