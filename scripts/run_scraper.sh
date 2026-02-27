@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Distiller Scraper Scheduled Task
+# Runs daily at 3:00 AM using launchd
+# Configuration: com.distiller.scraper.plist
+
+set -e
+
+PROJECT_DIR="/Users/Henry/Project/Distiller"
+LOG_DIR="$PROJECT_DIR/logs"
+VENV_PYTHON="$PROJECT_DIR/venv/bin/python"
+TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+
+# Create log directory if not exists
+mkdir -p "$LOG_DIR"
+
+# Log file paths
+LOG_FILE="$LOG_DIR/scraper_${TIMESTAMP}.log"
+
+# Change to project directory
+cd "$PROJECT_DIR"
+
+echo "==========================================" | tee -a "$LOG_FILE"
+echo "Distiller Scraper - Scheduled Run" | tee -a "$LOG_FILE"
+echo "Start Time: $(date)" | tee -a "$LOG_FILE"
+echo "==========================================" | tee -a "$LOG_FILE"
+
+# Check if virtual environment exists
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "❌ Error: Virtual environment not found at $VENV_PYTHON" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Check if run.py exists
+if [ ! -f "$PROJECT_DIR/run.py" ]; then
+    echo "❌ Error: run.py not found at $PROJECT_DIR/run.py" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Run the scraper with full mode
+echo "Starting scraper in FULL mode..." | tee -a "$LOG_FILE"
+if "$VENV_PYTHON" run.py --mode full --output both --use-api 2>&1 | tee -a "$LOG_FILE"; then
+    echo "" | tee -a "$LOG_FILE"
+    echo "✅ Scraper completed successfully!" | tee -a "$LOG_FILE"
+    echo "End Time: $(date)" | tee -a "$LOG_FILE"
+    echo "Log saved to: $LOG_FILE" | tee -a "$LOG_FILE"
+    
+    # Send success notification (macOS)
+    osascript -e 'display notification "Distiller scraper completed successfully!" with title "Scraper Success"' 2>/dev/null || true
+    
+    # Optional: Send email notification (requires mail setup)
+    # echo "Scraper completed successfully at $(date)" | mail -s "Distiller Scraper - Success" your-email@example.com
+    
+else
+    echo "" | tee -a "$LOG_FILE"
+    echo "❌ Scraper failed with exit code $?" | tee -a "$LOG_FILE"
+    echo "End Time: $(date)" | tee -a "$LOG_FILE"
+    echo "Log saved to: $LOG_FILE" | tee -a "$LOG_FILE"
+    
+    # Send failure notification (macOS)
+    osascript -e 'display notification "Distiller scraper failed! Check logs." with title "Scraper Error"' 2>/dev/null || true
+    
+    # Optional: Send email notification on failure
+    # echo "Scraper failed at $(date). Check logs at $LOG_FILE" | mail -s "Distiller Scraper - FAILED" your-email@example.com
+    
+    exit 1
+fi
+
+echo "==========================================" | tee -a "$LOG_FILE"
