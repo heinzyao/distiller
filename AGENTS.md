@@ -19,6 +19,49 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-02-27 | Claude Code
+
+**工作內容**：
+1. **Phase 1 - 資料庫儲存支援**
+   - 新增 `distiller_scraper/storage.py`，實作 `StorageBackend` ABC、`SQLiteStorage`、`CSVStorage`
+   - SQLite schema：`spirits` 主表、`flavor_profiles` 正規化副表、`scrape_runs` 執行記錄表（WAL 模式）
+   - 修復 Python 3.12 sqlite3 upsert 問題：`ON CONFLICT DO UPDATE` 導致 `cursor.lastrowid` 回傳錯誤值，改用明確的 SELECT → INSERT/UPDATE 流程
+   - 整合 `storage` 參數至 `DistillerScraperV2`，支援 `--output csv|sqlite|both` 與 `--db-path` CLI 旗標
+   - 新增 `tests/unit/test_storage.py`（30 個測試）
+
+2. **Phase 2 - 分頁爬取**
+   - 在 `config.py` 新增分頁常數：`PAGINATION_ENABLED`, `MAX_PAGES_PER_QUERY`, `MIN_NEW_URLS_PER_PAGE`, `DUPLICATE_RATIO_THRESHOLD`
+   - 在 `SearchURLBuilder.build_search_url()` 加入 `page` 參數（page=1 省略，≥2 附加 `&page=N`）
+   - 新增 scraper 方法：`_get_search_queries()`, `_fetch_spirit_urls_from_page()`, `_scrape_urls()`, `scrape_category_paginated()`
+   - 三段式停止條件：頁面空白 / 新 URL 數過少 / 重複率過高
+   - 新增 `--no-pagination` CLI 旗標（預設啟用分頁）
+   - 新增 `tests/integration/test_pagination.py`（22 個測試）
+
+3. **Phase 3 - API 端點探索**
+   - 新增 `distiller_scraper/api_client.py`，實作 `DistillerAPIClient`
+   - 雙重探索策略：Chrome Performance Log XHR 擷取 → 候選路徑探測（`/search.json`, `/api/v1/spirits/search` 等）
+   - 三層備援架構：API（最快）→ Selenium（可靠）同時適用搜尋列表與詳情爬取
+   - 新增 `scraper.discover_api()` 在爬取前自動探測；新增 `--use-api` CLI 旗標
+   - 新增 `tests/unit/test_api_client.py`（42 個測試）
+
+**主要變更**：
+- 新增 `distiller_scraper/storage.py`（儲存抽象層）
+- 新增 `distiller_scraper/api_client.py`（API 探索客戶端）
+- 修改 `distiller_scraper/scraper.py`（分頁、API 整合、XHR 擷取）
+- 修改 `distiller_scraper/config.py`（分頁常數）
+- 修改 `distiller_scraper/selectors.py`（`build_search_url` page 參數）
+- 修改 `distiller_scraper/__init__.py`（版本 2.2.0，新增延遲導入）
+- 修改 `run.py`（新增 `--output`, `--db-path`, `--no-pagination`, `--use-api` 旗標）
+- 新增 `tests/unit/test_storage.py`（30 測試）
+- 新增 `tests/unit/test_api_client.py`（42 測試）
+- 新增 `tests/integration/test_pagination.py`（22 測試）
+- 修改 `tests/unit/test_url_builder.py`（加入 4 個分頁測試）
+- **總計：192 個測試全數通過**（含先前 94 個）
+
+**Commit**：`ae6a958`
+
+---
+
 ### 2026-01-28 | OpenCode Agent
 
 **工作內容**：
@@ -125,10 +168,12 @@ python run.py
 **核心檔案說明**：
 | 檔案 | 說明 |
 |------|------|
-| `distiller_scraper/scraper.py` | 主爬蟲類別 `DistillerScraperV2` |
-| `distiller_scraper/selectors.py` | CSS 選擇器定義 |
-| `distiller_scraper/config.py` | 爬蟲配置 |
-| `run.py` | 執行入口 |
+| `distiller_scraper/scraper.py` | 主爬蟲類別 `DistillerScraperV2`（含分頁、API 整合） |
+| `distiller_scraper/selectors.py` | CSS 選擇器定義、`SearchURLBuilder` |
+| `distiller_scraper/config.py` | 爬蟲配置（含分頁常數） |
+| `distiller_scraper/storage.py` | 儲存後端（SQLiteStorage, CSVStorage） |
+| `distiller_scraper/api_client.py` | API 端點探索客戶端 |
+| `run.py` | 執行入口（支援 --output, --db-path, --no-pagination, --use-api） |
 
 ---
 
@@ -145,24 +190,46 @@ python run.py
    ```
    Distiller/
    ├── distiller_scraper/     # 核心模組
-   │   ├── scraper.py         # 主爬蟲
-   │   ├── selectors.py       # CSS 選擇器
-   │   └── config.py          # 配置
-   ├── run.py                  # 執行入口
+   │   ├── scraper.py         # 主爬蟲 (DistillerScraperV2)
+   │   ├── selectors.py       # CSS 選擇器 & SearchURLBuilder
+   │   ├── config.py          # 爬蟲配置（含分頁常數）
+   │   ├── storage.py         # 儲存後端 (SQLiteStorage, CSVStorage)
+   │   └── api_client.py      # API 端點探索客戶端
+   ├── tests/
+   │   ├── unit/              # 單元測試（無網路/瀏覽器）
+   │   └── integration/       # 整合測試（Mock driver）
+   ├── run.py                 # 執行入口
    ├── requirements.txt
-   └── data/                   # CSV 輸出
+   └── data/                  # CSV 輸出
    ```
 
 2. **關鍵類別**：
-   - `DistillerScraperV2`: 主爬蟲類別，支援 headless Chrome
-   - `Selectors`: CSS 選擇器定義（2026-01-27 驗證）
+   - `DistillerScraperV2`: 主爬蟲，支援 headless Chrome、分頁、API 整合
+   - `DistillerAPIClient`: 自動探索 API 端點，API-first 搜尋與詳情
+   - `SQLiteStorage` / `CSVStorage`: 儲存後端（共同繼承 `StorageBackend` ABC）
    - `DataExtractor`: 資料提取輔助類別
-   - `SearchURLBuilder`: URL 建構器
+   - `SearchURLBuilder`: URL 建構器（支援 `page` 參數）
 
-3. **擴展建議**：
+3. **常用執行方式**：
+   ```bash
+   # 測試模式（5 筆，CSV 輸出）
+   python run.py --mode test
+
+   # 中等規模（~200 筆，SQLite 輸出，啟用 API 模式）
+   python run.py --mode medium --output sqlite --use-api
+
+   # 完整爬取（1000+ 筆，CSV+SQLite 雙輸出）
+   python run.py --mode full --output both --db-path spirits.db
+
+   # 停用分頁，使用舊式滾動爬取
+   python run.py --mode test --no-pagination
+   ```
+
+4. **擴展建議**：
    - 新增類別：修改 `config.py` 中的 `CATEGORIES`
    - 新增欄位：更新 `selectors.py` 中的選擇器
    - 調整速率：修改 `config.py` 中的延遲設定
+   - 調整分頁行為：修改 `config.py` 中的 `MAX_PAGES_PER_QUERY` 等常數
 
 ---
 
@@ -187,10 +254,10 @@ python run.py
 ## 📝 待辦事項
 
 - [x] 加入自動化測試 (pytest) ✅ 2026-01-28
-- [ ] 實作分頁爬取以擴大資料量
-- [ ] 探索 API 端點提高效率
-- [ ] 加入資料庫儲存支援
+- [x] 實作分頁爬取以擴大資料量 ✅ 2026-02-27
+- [x] 探索 API 端點提高效率 ✅ 2026-02-27
+- [x] 加入資料庫儲存支援 ✅ 2026-02-27
 
 ---
 
-*最後更新：2026-01-28 by OpenCode Agent*
+*最後更新：2026-02-27 by Claude Code*
