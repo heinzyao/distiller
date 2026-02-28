@@ -2,6 +2,25 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.3.0] - 2026-02-28
+
+### 新增
+- **LINE Messaging API 通知** (`distiller_scraper/notify.py`)
+  - `LineNotifier` 類別，透過 Channel ID + Secret 動態取得短期 Access Token
+  - 與 music-collector 共用同一組 LINE Bot 憑證
+  - `notify_success()` / `notify_failure()` 格式化爬取結果通知
+  - 爬取完成或失敗時自動推播至 LINE
+- **排程自動化** (`com.distiller.scraper.plist` + `scripts/run_scraper.sh`)
+  - macOS launchd 排程，每日凌晨 3:00 自動執行完整爬取
+  - Shell 腳本含日誌記錄、macOS 通知、自動載入 `.env`
+- **新增 CLI 旗標**：`--notify-line`（爬取完成後發送 LINE 通知）
+- **新增 22 個測試**（`tests/unit/test_notify.py`），總計 214 個
+- 新增 `.env.example` 記錄所需環境變數
+
+### 變更
+- `run_*()` 函式回傳 `(bool, dict)` 以便傳遞統計資料至通知模組
+- `.gitignore` 新增 `logs/` 目錄
+
 ## [2.2.0] - 2026-02-27
 
 ### 新增

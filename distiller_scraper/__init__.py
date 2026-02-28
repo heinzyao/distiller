@@ -3,7 +3,7 @@ Distiller.com 爬蟲模組
 改進版本 - 修復 CSS 選擇器與分頁功能
 """
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 __all__ = [
     "DistillerScraperV2", "ScraperConfig", "Selectors",
     "SQLiteStorage", "CSVStorage", "DistillerAPIClient",

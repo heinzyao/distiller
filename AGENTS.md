@@ -19,6 +19,41 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-02-28 | Claude Code
+
+**工作內容**：
+1. **LINE Messaging API 通知**
+   - 新增 `distiller_scraper/notify.py`，實作 `LineNotifier` 類別
+   - 使用 Channel ID + Secret 動態取得短期 Access Token（與 music-collector 共用憑證）
+   - `notify_success()` / `notify_failure()` 格式化爬取結果推播至 LINE
+   - `run.py` 新增 `--notify-line` CLI 旗標
+   - 新增 `tests/unit/test_notify.py`（22 個測試）
+
+2. **排程自動化**
+   - 新增 `com.distiller.scraper.plist`（macOS launchd，每日凌晨 3:00 執行）
+   - 新增 `scripts/run_scraper.sh`（完整模式爬取，含日誌、macOS 通知、LINE 通知）
+   - Shell 腳本自動載入 `.env` 環境變數
+
+3. **文件翻譯與整理**
+   - CHANGELOG.md 全文翻譯為繁體中文
+   - README.md 全面改寫：新增完整 CLI 參數表、架構說明、儲存後端比較
+   - 清理專案中過期的 CSV 測試輸出與日誌檔案
+
+**主要變更**：
+- 新增 `distiller_scraper/notify.py`（LINE 通知模組）
+- 新增 `com.distiller.scraper.plist`（launchd 排程）
+- 新增 `scripts/run_scraper.sh`（排程執行腳本）
+- 新增 `.env.example`（環境變數範本）
+- 修改 `run.py`（新增 `--notify-line`、`run_*()` 回傳 `(bool, dict)`）
+- 修改 `distiller_scraper/__init__.py`（新增 `LineNotifier` 延遲導入）
+- 修改 `scripts/run_scraper.sh`（載入 `.env`、加入 `--notify-line`）
+- 新增 `tests/unit/test_notify.py`（22 測試）
+- **總計：214 個測試全數通過**
+
+**Commits**：`b2cf8cf`, `6c07deb`, `6514a2a`, `91faaf9`
+
+---
+
 ### 2026-02-27 | Claude Code
 
 **工作內容**：
@@ -173,7 +208,9 @@ python run.py --mode full
 | `distiller_scraper/config.py` | 爬蟲配置（含分頁常數） |
 | `distiller_scraper/storage.py` | 儲存後端（SQLiteStorage, CSVStorage） |
 | `distiller_scraper/api_client.py` | API 端點探索客戶端 |
-| `run.py` | 執行入口（支援 --output, --db-path, --no-pagination, --use-api） |
+| `distiller_scraper/notify.py` | LINE 通知模組（LineNotifier） |
+| `run.py` | 執行入口（支援 --output, --db-path, --no-pagination, --use-api, --notify-line） |
+| `scripts/run_scraper.sh` | 排程執行腳本（每日凌晨 3:00） |
 
 ---
 
@@ -194,18 +231,22 @@ python run.py --mode full
    │   ├── selectors.py       # CSS 選擇器 & SearchURLBuilder
    │   ├── config.py          # 爬蟲配置（含分頁常數）
    │   ├── storage.py         # 儲存後端 (SQLiteStorage, CSVStorage)
-   │   └── api_client.py      # API 端點探索客戶端
+   │   ├── api_client.py      # API 端點探索客戶端
+   │   └── notify.py          # LINE 通知模組 (LineNotifier)
+   ├── scripts/
+   │   └── run_scraper.sh     # 排程執行腳本
    ├── tests/
    │   ├── unit/              # 單元測試（無網路/瀏覽器）
    │   └── integration/       # 整合測試（Mock driver）
    ├── run.py                 # 執行入口
-   ├── requirements.txt
-   └── data/                  # CSV 輸出
+   ├── .env                   # 環境變數（LINE 憑證，不進版控）
+   └── com.distiller.scraper.plist  # launchd 排程設定
    ```
 
 2. **關鍵類別**：
    - `DistillerScraperV2`: 主爬蟲，支援 headless Chrome、分頁、API 整合
    - `DistillerAPIClient`: 自動探索 API 端點，API-first 搜尋與詳情
+   - `LineNotifier`: LINE 推播通知（Channel ID + Secret OAuth 流程）
    - `SQLiteStorage` / `CSVStorage`: 儲存後端（共同繼承 `StorageBackend` ABC）
    - `DataExtractor`: 資料提取輔助類別
    - `SearchURLBuilder`: URL 建構器（支援 `page` 參數）
@@ -223,6 +264,9 @@ python run.py --mode full
 
    # 停用分頁，使用舊式滾動爬取
    python run.py --mode test --no-pagination
+
+   # 啟用 LINE 通知
+   python run.py --mode full --notify-line
    ```
 
 4. **擴展建議**：
@@ -257,7 +301,8 @@ python run.py --mode full
 - [x] 實作分頁爬取以擴大資料量 ✅ 2026-02-27
 - [x] 探索 API 端點提高效率 ✅ 2026-02-27
 - [x] 加入資料庫儲存支援 ✅ 2026-02-27
+- [x] LINE 通知與排程自動化 ✅ 2026-02-28
 
 ---
 
-*最後更新：2026-02-27 by Claude Code*
+*最後更新：2026-02-28 by Claude Code*
