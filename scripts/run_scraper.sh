@@ -7,6 +7,13 @@
 set -e
 
 PROJECT_DIR="/Users/Henry/Project/Distiller"
+
+# 載入環境變數（LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID 等）
+if [ -f "$PROJECT_DIR/.env" ]; then
+    set -a
+    source "$PROJECT_DIR/.env"
+    set +a
+fi
 LOG_DIR="$PROJECT_DIR/logs"
 VENV_PYTHON="$PROJECT_DIR/venv/bin/python"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
@@ -39,7 +46,7 @@ fi
 
 # Run the scraper with full mode
 echo "Starting scraper in FULL mode..." | tee -a "$LOG_FILE"
-if "$VENV_PYTHON" run.py --mode full --output both --use-api 2>&1 | tee -a "$LOG_FILE"; then
+if "$VENV_PYTHON" run.py --mode full --output both --use-api --notify-line 2>&1 | tee -a "$LOG_FILE"; then
     echo "" | tee -a "$LOG_FILE"
     echo "✅ Scraper completed successfully!" | tee -a "$LOG_FILE"
     echo "End Time: $(date)" | tee -a "$LOG_FILE"

@@ -7,6 +7,7 @@ __version__ = "2.2.0"
 __all__ = [
     "DistillerScraperV2", "ScraperConfig", "Selectors",
     "SQLiteStorage", "CSVStorage", "DistillerAPIClient",
+    "LineNotifier",
 ]
 
 
@@ -30,4 +31,7 @@ def __getattr__(name):
     elif name == "DistillerAPIClient":
         from .api_client import DistillerAPIClient
         return DistillerAPIClient
+    elif name == "LineNotifier":
+        from .notify import LineNotifier
+        return LineNotifier
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -17,6 +17,7 @@ venv/
 
 # Logs
 *.log
+logs/
 
 # Data outputs (keep only versioned/released data)
 distiller_spirits_*.csv

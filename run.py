@@ -2,7 +2,7 @@
 """
 Distiller 爬蟲 V2 執行腳本
 用法:
-    python run_scraper_v2.py [--test|--medium|--full]
+    python run.py [--mode test|medium|full] [--output csv|sqlite|both] [--notify-line]
 """
 
 import argparse
@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from distiller_scraper.api_client import DistillerAPIClient
+from distiller_scraper.notify import LineNotifier
 from distiller_scraper.scraper import DistillerScraperV2
 from distiller_scraper.storage import CSVStorage, SQLiteStorage
 
@@ -68,7 +69,7 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    return len(scraper.spirits_data) > 0
+    return len(scraper.spirits_data) > 0, stats
 
 
 def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
@@ -97,7 +98,7 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    return len(scraper.spirits_data) > 0
+    return len(scraper.spirits_data) > 0, stats
 
 
 def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
@@ -134,7 +135,7 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    return len(scraper.spirits_data) > 0
+    return len(scraper.spirits_data) > 0, stats
 
 
 def main():
@@ -166,19 +167,36 @@ def main():
         action="store_true",
         help="啟用 API 模式（自動探測端點，大幅提升爬取速度）",
     )
+    parser.add_argument(
+        "--notify-line",
+        action="store_true",
+        help="爬取完成後透過 LINE Messaging API 發送通知",
+    )
 
     args = parser.parse_args()
 
     print(f"\n開始時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     if args.mode == "test":
-        success = run_test(args.output, args.db_path, args)
+        success, stats = run_test(args.output, args.db_path, args)
     elif args.mode == "medium":
-        success = run_medium(args.output, args.db_path, args)
+        success, stats = run_medium(args.output, args.db_path, args)
     else:
-        success = run_full(args.output, args.db_path, args)
+        success, stats = run_full(args.output, args.db_path, args)
 
     print(f"\n結束時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # LINE 通知
+    if args.notify_line:
+        notifier = LineNotifier()
+        if not notifier.is_configured():
+            print("⚠️  LINE 通知未設定（缺少 LINE_CHANNEL_ACCESS_TOKEN 或 LINE_USER_ID）")
+        elif success:
+            notifier.notify_success(args.mode, stats)
+            print("📱 LINE 通知已發送")
+        else:
+            notifier.notify_failure(args.mode)
+            print("📱 LINE 失敗通知已發送")
 
     if success:
         print("\n✅ 爬蟲執行成功！")
