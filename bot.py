@@ -430,7 +430,7 @@ def _handle(text: str, db_path: str) -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
+    port = int(os.getenv("PORT", 8000))
     print(f"""
 Distiller LINE Bot 已啟動
 ────────────────────────
@@ -443,6 +443,9 @@ DB   : {DB_DEFAULT}
 3. 複製 https://xxxx.ngrok.io/webhook
 4. 在 LINE Developers Console 貼上 Webhook URL
 5. 開啟 Use webhook 開關
+
+注意：macOS AirPlay Receiver 會佔用 port 5000
+      可在系統設定 → 通用 → AirDrop 與接力 中關閉，或使用預設 port 8000
 """)
     app = create_app()
     app.run(host="0.0.0.0", port=port, debug=False)
