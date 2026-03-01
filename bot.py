@@ -35,7 +35,10 @@ import sys
 from pathlib import Path
 
 import requests
+from dotenv import load_dotenv
 from flask import Flask, abort, request
+
+load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent))
 

@@ -30,9 +30,9 @@ class LineNotifier:
         channel_secret: str | None = None,
         user_id: str | None = None,
     ):
-        self.channel_id = channel_id or os.getenv("LINE_CHANNEL_ID", "")
-        self.channel_secret = channel_secret or os.getenv("LINE_CHANNEL_SECRET", "")
-        self.user_id = user_id or os.getenv("LINE_USER_ID", "")
+        self.channel_id = channel_id if channel_id is not None else os.getenv("LINE_CHANNEL_ID", "")
+        self.channel_secret = channel_secret if channel_secret is not None else os.getenv("LINE_CHANNEL_SECRET", "")
+        self.user_id = user_id if user_id is not None else os.getenv("LINE_USER_ID", "")
 
     def is_configured(self) -> bool:
         """當 channel_id、channel_secret、user_id 皆已設定時回傳 True。"""

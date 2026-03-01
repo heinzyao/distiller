@@ -2,6 +2,18 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.3.1] - 2026-03-01
+
+### 修復
+- **`run.py` LINE 通知誤報**：`notify_success()` / `notify_failure()` 回傳 `False` 時仍印出「已發送」的 bug，現改為正確檢查回傳值
+- **`notify.py` 空字串憑證回退 bug**：`channel_id="" ` 時 `or` 運算子會錯誤回退至環境變數，改用 `is not None` 判斷，確保測試中傳入空字串有效
+- **`test_notify.py` 5 個測試失敗**：上述 `notify.py` 修正後，所有 277 個測試全數通過
+
+### 新增
+- **LINE 通知自動重試**：通知失敗時等待 30 秒後自動重試一次，處理凌晨排程時暫時性 DNS 解析失敗的問題
+- **`scripts/run_bot.sh`**：LINE Bot 啟動腳本（載入 `.env`、呼叫 `bot.py`）
+- **`com.distiller.bot.plist`**：LINE Bot 的 macOS launchd 服務設定（`KeepAlive = true`，需手動安裝）
+
 ## [2.3.0] - 2026-02-28
 
 ### 新增

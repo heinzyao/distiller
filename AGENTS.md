@@ -19,6 +19,38 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-03-01 | Claude Code
+
+**工作內容**：
+1. **問題診斷：排程 LINE 通知失敗**
+   - 確認 launchd 排程正常運作（`runs = 2`，exit code 0，Feb 28 & Mar 1 均有執行）
+   - 診斷根因：凌晨 3:52 `api.line.me` DNS 解析失敗（暫時性網路問題），但 `run.py` 仍誤印「📱 LINE 通知已發送」
+   - 修復 `run.py`：正確檢查 `notify_success()` / `notify_failure()` 回傳值
+   - 新增 30 秒自動重試機制，處理凌晨暫時性 DNS 問題
+
+2. **問題診斷：無法透過 LINE 查詢**
+   - 確認 `bot.py` 已在 port 8000 運行、ngrok tunnel 已啟動
+   - 確認 `load_dotenv()` 修復已生效（webhook 簽名驗證回應 HTTP 200）
+   - 問題根因：ngrok 每次重啟 URL 不同，LINE Developers Console Webhook URL 需手動更新
+
+3. **修復 `notify.py` 空字串憑證 bug**
+   - `channel_id=""` 時 `or` 運算子回退至 `os.getenv()`，導致 5 個測試失敗
+   - 改用 `channel_id if channel_id is not None else os.getenv(...)` 修正
+   - 測試全數恢復通過（277/277）
+
+4. **新增 LINE Bot 服務化設施**
+   - `scripts/run_bot.sh`：載入 `.env` 並啟動 `bot.py`
+   - `com.distiller.bot.plist`：launchd 服務設定（KeepAlive，供日後安裝用）
+
+**主要變更**：
+- 修改 `run.py`（通知回傳值檢查、30 秒重試、import time）
+- 修改 `distiller_scraper/notify.py`（`is not None` 憑證判斷）
+- 新增 `scripts/run_bot.sh`（Bot 啟動腳本）
+- 新增 `com.distiller.bot.plist`（Bot launchd 設定）
+- **總計：277 個測試全數通過**
+
+---
+
 ### 2026-02-28 | Claude Code
 
 **工作內容**：
@@ -210,7 +242,10 @@ python run.py --mode full
 | `distiller_scraper/api_client.py` | API 端點探索客戶端 |
 | `distiller_scraper/notify.py` | LINE 通知模組（LineNotifier） |
 | `run.py` | 執行入口（支援 --output, --db-path, --no-pagination, --use-api, --notify-line） |
+| `bot.py` | LINE Bot（Flask webhook，port 8000，簽名驗證 + 查詢回覆） |
+| `query.py` | CLI 查詢工具（list / search / top / info / stats / flavors / export） |
 | `scripts/run_scraper.sh` | 排程執行腳本（每日凌晨 3:00） |
+| `scripts/run_bot.sh` | Bot 啟動腳本（供 launchd 使用） |
 
 ---
 
@@ -234,13 +269,17 @@ python run.py --mode full
    │   ├── api_client.py      # API 端點探索客戶端
    │   └── notify.py          # LINE 通知模組 (LineNotifier)
    ├── scripts/
-   │   └── run_scraper.sh     # 排程執行腳本
+   │   ├── run_scraper.sh     # 排程執行腳本（爬蟲，每日凌晨 3:00）
+   │   └── run_bot.sh         # Bot 啟動腳本（載入 .env 後執行 bot.py）
    ├── tests/
    │   ├── unit/              # 單元測試（無網路/瀏覽器）
    │   └── integration/       # 整合測試（Mock driver）
    ├── run.py                 # 執行入口
+   ├── bot.py                 # LINE Bot（Flask webhook，port 8000）
+   ├── query.py               # CLI 查詢工具（sqlite3 直查）
    ├── .env                   # 環境變數（LINE 憑證，不進版控）
-   └── com.distiller.scraper.plist  # launchd 排程設定
+   ├── com.distiller.scraper.plist  # launchd 排程設定（爬蟲）
+   └── com.distiller.bot.plist      # launchd 服務設定（Bot，需手動安裝）
    ```
 
 2. **關鍵類別**：
@@ -302,7 +341,9 @@ python run.py --mode full
 - [x] 探索 API 端點提高效率 ✅ 2026-02-27
 - [x] 加入資料庫儲存支援 ✅ 2026-02-27
 - [x] LINE 通知與排程自動化 ✅ 2026-02-28
+- [x] LINE Bot（webhook 查詢）與 CLI 查詢工具 ✅ 2026-02-28
+- [x] 通知可靠性修復（重試、回傳值檢查）✅ 2026-03-01
 
 ---
 
-*最後更新：2026-02-28 by Claude Code*
+*最後更新：2026-03-01 by Claude Code*

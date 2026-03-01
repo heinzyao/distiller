@@ -8,6 +8,7 @@ Distiller 爬蟲 V2 執行腳本
 import argparse
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -186,17 +187,21 @@ def main():
 
     print(f"\n結束時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # LINE 通知
+    # LINE 通知（失敗時自動等待 30 秒重試一次，處理 3AM 暫時性 DNS 問題）
     if args.notify_line:
         notifier = LineNotifier()
         if not notifier.is_configured():
-            print("⚠️  LINE 通知未設定（缺少 LINE_CHANNEL_ACCESS_TOKEN 或 LINE_USER_ID）")
-        elif success:
-            notifier.notify_success(args.mode, stats)
-            print("📱 LINE 通知已發送")
+            print("⚠️  LINE 通知未設定（缺少 LINE_CHANNEL_ID、LINE_CHANNEL_SECRET 或 LINE_USER_ID）")
         else:
-            notifier.notify_failure(args.mode)
-            print("📱 LINE 失敗通知已發送")
+            send_fn = notifier.notify_success if success else notifier.notify_failure
+            send_args = (args.mode, stats) if success else (args.mode,)
+            ok = send_fn(*send_args)
+            if not ok:
+                print("⚠️  LINE 通知第一次失敗，30 秒後重試…")
+                time.sleep(30)
+                ok = send_fn(*send_args)
+            label = "LINE 通知已發送" if success else "LINE 失敗通知已發送"
+            print(f"📱 {label}" if ok else "⚠️  LINE 通知發送失敗（請查看日誌）")
 
     if success:
         print("\n✅ 爬蟲執行成功！")
