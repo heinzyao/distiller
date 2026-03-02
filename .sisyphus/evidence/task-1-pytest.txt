@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- /Users/Henry/Project/Distiller/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/Henry/Project/Distiller
+configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+plugins: mock-3.15.1
+collecting ... collected 283 items / 6 deselected / 277 selected
+
+tests/integration/test_pagination.py::TestGetSearchQueries::test_no_styles PASSED [  0%]
+tests/integration/test_pagination.py::TestGetSearchQueries::test_whiskey_styles PASSED [  0%]
+tests/integration/test_pagination.py::TestGetSearchQueries::test_gin_styles PASSED [  1%]
+tests/integration/test_pagination.py::TestGetSearchQueries::test_rum_styles PASSED [  1%]
+tests/integration/test_pagination.py::TestGetSearchQueries::test_vodka_styles PASSED [  1%]
+tests/integration/test_pagination.py::TestGetSearchQueries::test_unknown_category_with_styles PASSED [  2%]
+tests/integration/test_pagination.py::TestGetSearchQueries::test_url_contains_sort PASSED [  2%]
+tests/integration/test_pagination.py::TestFetchSpiritUrlsFromPage::test_returns_urls PASSED [  2%]
+tests/integration/test_pagination.py::TestFetchSpiritUrlsFromPage::test_empty_page_returns_empty PASSED [  3%]
+tests/integration/test_pagination.py::TestFetchSpiritUrlsFromPage::test_calls_scroll_page PASSED [  3%]
+tests/integration/test_pagination.py::TestScrapeCategoryPaginated::test_single_page_result PASSED [  3%]
+tests/integration/test_pagination.py::TestScrapeCategoryPaginated::test_two_pages PASSED [  4%]
+tests/integration/test_pagination.py::TestScrapeCategoryPaginated::test_respects_max_spirits PASSED [  4%]
+tests/integration/test_pagination.py::TestScrapeCategoryPaginated::test_high_duplicate_ratio_stops_pagination PASSED [  5%]
+tests/integration/test_pagination.py::TestScrapeCategoryPaginated::test_skips_seen_urls PASSED [  5%]
+tests/integration/test_pagination.py::TestScrapeCategoryRouting::test_uses_paginated_by_default PASSED [  5%]
+tests/integration/test_pagination.py::TestScrapeCategoryRouting::test_uses_scroll_when_disabled 

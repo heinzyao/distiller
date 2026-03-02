@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/Henry/Project/Distiller
+configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+plugins: mock-3.15.1
+collected 242 items
+
+tests/unit/test_api_client.py .......................................... [ 17%]
+                                                                         [ 17%]
+tests/unit/test_bot.py .........................................         [ 34%]
+tests/unit/test_config.py ...........................                    [ 45%]
+tests/unit/test_notify.py ......................                         [ 54%]
+tests/unit/test_query.py ......................                          [ 63%]
+tests/unit/test_selectors.py .................................           [ 77%]
+tests/unit/test_storage.py ..............................                [ 89%]
+tests/unit/test_url_builder.py .........................                 [100%]
+
+============================= 242 passed in 0.34s ==============================

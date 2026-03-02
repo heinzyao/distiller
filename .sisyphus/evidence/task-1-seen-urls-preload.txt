@@ -1,0 +1,2 @@
+seen_urls count: 1627
+PASS: seen_urls loaded from DB

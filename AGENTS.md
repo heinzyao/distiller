@@ -19,6 +19,28 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-03-02 | OpenCode Atlas Orchestrator
+
+**工作內容**：
+1. **爬蟲容錯修復：3 個連鎖崩潰 Bug**
+   - 根因分析：DB 已有資料 → 100% 重複率 → 誤判「分頁無效」→ 未受保護的滾動 fallback → Selenium timeout → 未捕捉例外 → 整個爬蟲崩潰
+   - **Bug 3 修復**：在分頁迴圈前快照 DB URL (`db_urls`)，若所有 URL 已在 DB 中則優雅跳過並 break，不觸發滾動 fallback
+   - **Bug 1 修復**：以 try/except 包裝滾動 fallback (`_fetch_spirit_urls_from_page` + `_scrape_urls`)，timeout 不再崩潰
+   - **Bug 2 修復**：將 try/except 移至 for 迴圈內部，實現 per-category 錯誤隔離，單一類別失敗不影響後續類別
+
+2. **全面驗證**
+   - 單元測試 242/242 全數通過
+   - Live medium run 確認：9 個子類別優雅跳過（顯示「此類別資料已存在於資料庫，跳過」），whiskey/gin 兩大類別均正常執行，無崩潰
+   - Commit `e3d737d`：`fix(scraper): prevent crash on pagination fallback with existing DB data`
+
+**主要變更**：
+- 修改 `distiller_scraper/scraper.py`（+37/-24 行，3 個外科手術式修復）
+- **總計：242 個單元測試全數通過**
+
+**Commit**：`e3d737d`
+
+---
+
 ### 2026-03-01 | Claude Code
 
 **工作內容**：
@@ -343,7 +365,8 @@ python run.py --mode full
 - [x] LINE 通知與排程自動化 ✅ 2026-02-28
 - [x] LINE Bot（webhook 查詢）與 CLI 查詢工具 ✅ 2026-02-28
 - [x] 通知可靠性修復（重試、回傳值檢查）✅ 2026-03-01
+- [x] 爬蟲容錯修復（分頁 fallback 崩潰、per-category 錯誤隔離）✅ 2026-03-02
 
 ---
 
-*最後更新：2026-03-01 by Claude Code*
+*最後更新：2026-03-02 by OpenCode Atlas Orchestrator*
