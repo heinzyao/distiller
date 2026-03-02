@@ -1,6 +1,6 @@
 [project]
 name = "distiller-scraper"
-version = "2.3.0"
+version = "2.4.2"
 description = "從 Distiller.com 爬取烈酒評論資料的 Python 爬蟲"
 requires-python = ">=3.9"
 dependencies = [
