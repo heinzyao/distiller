@@ -5,7 +5,6 @@
 # Configuration: com.distiller.bot.plist
 
 PROJECT_DIR="/Users/Henry/Project/Distiller"
-VENV_PYTHON="$PROJECT_DIR/venv/bin/python"
 LOG_DIR="$PROJECT_DIR/logs"
 
 mkdir -p "$LOG_DIR"
@@ -18,4 +17,4 @@ if [ -f "$PROJECT_DIR/.env" ]; then
 fi
 
 cd "$PROJECT_DIR"
-exec "$VENV_PYTHON" bot.py
+exec uv run python bot.py

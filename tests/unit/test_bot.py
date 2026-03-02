@@ -9,14 +9,17 @@ import hmac
 import json
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from bot import (
+    _get_cached_token,
     _handle,
     _reply,
     _verify_signature,
@@ -347,3 +350,153 @@ class TestWebhook:
             client.post("/webhook", data=payload,
                         headers={"Content-Type": "application/json", "X-Line-Signature": sig})
         mock_reply.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Token 快取
+# ---------------------------------------------------------------------------
+
+
+class TestTokenCache:
+    def test_first_call_fetches_token(self):
+        with patch("bot._get_access_token", return_value="tok") as mock_fetch:
+            result = _get_cached_token("id", "sec")
+        assert result == "tok"
+        mock_fetch.assert_called_once()
+
+    def test_second_call_uses_cache(self):
+        with patch("bot._get_access_token", return_value="tok") as mock_fetch:
+            _get_cached_token("id", "sec")
+            _get_cached_token("id", "sec")
+        mock_fetch.assert_called_once()
+
+    def test_expired_token_refetches(self):
+        import bot
+        bot._token_cache["token"] = "old"
+        bot._token_cache["expires_at"] = time.time() - 100
+        with patch("bot._get_access_token", return_value="new-tok") as mock_fetch:
+            result = _get_cached_token("id", "sec")
+        mock_fetch.assert_called_once()
+        assert result == "new-tok"
+
+    def test_soon_to_expire_refetches(self):
+        import bot
+        bot._token_cache["token"] = "old"
+        bot._token_cache["expires_at"] = time.time() + 30  # inside 60s safety margin
+        with patch("bot._get_access_token", return_value="new-tok") as mock_fetch:
+            result = _get_cached_token("id", "sec")
+        mock_fetch.assert_called_once()
+        assert result == "new-tok"
+
+    def test_failed_fetch_returns_none(self):
+        import bot
+        with patch("bot._get_access_token", return_value=None):
+            result = _get_cached_token("id", "sec")
+        assert result is None
+        assert bot._token_cache.get("token") is None
+
+    def test_cache_populated_on_success(self):
+        import bot
+        with patch("bot._get_access_token", return_value="tok"):
+            _get_cached_token("id", "sec")
+        assert bot._token_cache["token"] == "tok"
+        assert "expires_at" in bot._token_cache
+
+
+# ---------------------------------------------------------------------------
+# Health Check
+# ---------------------------------------------------------------------------
+
+
+class TestHealthCheck:
+    def test_health_returns_200(self, client):
+        resp = client.get("/health")
+        assert resp.status_code == 200
+
+    def test_health_has_required_keys(self, client):
+        resp = client.get("/health")
+        data = resp.get_json()
+        assert "status" in data
+        assert "db_exists" in data
+        assert "token_cached" in data
+
+    def test_health_db_exists_true(self, client):
+        resp = client.get("/health")
+        data = resp.get_json()
+        assert data["db_exists"] is True
+
+    def test_health_token_cached_false(self, client):
+        resp = client.get("/health")
+        data = resp.get_json()
+        assert data["token_cached"] is False
+
+    def test_health_token_cached_true(self, client):
+        import bot
+        bot._token_cache["token"] = "tok"
+        resp = client.get("/health")
+        data = resp.get_json()
+        assert data["token_cached"] is True
+
+
+# ---------------------------------------------------------------------------
+# Webhook Verification Probe
+# ---------------------------------------------------------------------------
+
+
+class TestWebhookVerificationProbe:
+    def test_empty_events_returns_200_no_signature(self, client):
+        payload = json.dumps({"events": []}).encode()
+        resp = client.post(
+            "/webhook",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 200
+
+    def test_malformed_json_returns_200(self, client):
+        resp = client.post(
+            "/webhook",
+            data=b"not-json",
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# _reply() 回傳值
+# ---------------------------------------------------------------------------
+
+
+class TestReplyReturnValue:
+    def test_reply_returns_true_on_200(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        with patch("requests.post", return_value=mock_resp):
+            result = _reply("tok", "msg", "access-tok")
+        assert result is True
+
+    def test_reply_returns_false_on_non_200(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 400
+        mock_resp.text = "bad request"
+        with patch("requests.post", return_value=mock_resp):
+            result = _reply("tok", "msg", "access-tok")
+        assert result is False
+
+    def test_reply_returns_false_on_network_error(self):
+        with patch("requests.post", side_effect=requests.RequestException("network error")):
+            result = _reply("tok", "msg", "access-tok")
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# DB-missing log
+# ---------------------------------------------------------------------------
+
+
+class TestDbMissingLog:
+    def test_missing_db_logs_warning(self, tmp_path, caplog):
+        import logging
+        with caplog.at_level(logging.WARNING):
+            _handle("統計", str(tmp_path / "no.db"))
+        assert "資料庫不存在" in caplog.text

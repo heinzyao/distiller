@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 Distiller LINE Bot
 
@@ -32,13 +33,16 @@ import os
 import re
 import sqlite3
 import sys
+from typing import cast
+import time
 from pathlib import Path
+
 
 import requests
 from dotenv import load_dotenv
 from flask import Flask, abort, request
 
-load_dotenv()
+_ = load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -50,10 +54,13 @@ LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 DB_DEFAULT = "distiller.db"
 MSG_LIMIT = 4900  # LINE 單則訊息字元上限
 
+_token_cache: dict[str, str | float] = {}
+
 
 # ---------------------------------------------------------------------------
 # LINE API 輔助
 # ---------------------------------------------------------------------------
+
 
 def _get_access_token(channel_id: str, channel_secret: str) -> str | None:
     """用 Channel ID + Secret 取得短期 Access Token。"""
@@ -68,12 +75,32 @@ def _get_access_token(channel_id: str, channel_secret: str) -> str | None:
             timeout=15,
         )
         if resp.status_code == 200:
-            return resp.json()["access_token"]
+            data = cast(object, resp.json())
+            if isinstance(data, dict):
+                token = data.get("access_token")
+                if isinstance(token, str):
+                    return token
+            return None
         logger.warning("Token 取得失敗：%s", resp.text)
         return None
     except requests.RequestException as exc:
         logger.error("Token 請求失敗：%s", exc)
         return None
+
+
+def _get_cached_token(channel_id: str, channel_secret: str) -> str | None:
+    """取得有效的 Access Token（優先使用快取，逾期前 60 秒自動更新）。"""
+    now = time.time()
+    token = _token_cache.get("token")
+    expires_at = _token_cache.get("expires_at", 0.0)
+    if isinstance(token, str) and isinstance(expires_at, (int, float)):
+        if now < expires_at - 60:
+            return token
+    token = _get_access_token(channel_id, channel_secret)
+    if token:
+        _token_cache["token"] = token
+        _token_cache["expires_at"] = now + 82800  # 23 小時 TTL
+    return token
 
 
 def _verify_signature(body: bytes, signature: str, channel_secret: str) -> bool:
@@ -82,9 +109,9 @@ def _verify_signature(body: bytes, signature: str, channel_secret: str) -> bool:
     return base64.b64encode(digest).decode() == signature
 
 
-def _reply(reply_token: str, text: str, access_token: str) -> None:
+def _reply(reply_token: str, text: str, access_token: str) -> bool:
     """透過 Reply API 回覆訊息（自動拆分超長訊息，最多 5 則）。"""
-    chunks = [text[i:i + MSG_LIMIT] for i in range(0, len(text), MSG_LIMIT)][:5]
+    chunks = [text[i : i + MSG_LIMIT] for i in range(0, len(text), MSG_LIMIT)][:5]
     messages = [{"type": "text", "text": chunk} for chunk in chunks]
     try:
         resp = requests.post(
@@ -97,14 +124,18 @@ def _reply(reply_token: str, text: str, access_token: str) -> None:
             timeout=10,
         )
         if resp.status_code != 200:
-            logger.warning("Reply 失敗：%s %s", resp.status_code, resp.text)
+            logger.warning("Reply 失敗：%s %s", resp.status_code, resp.text[:200])
+            return False
+        return True
     except requests.RequestException as exc:
         logger.error("Reply 請求失敗：%s", exc)
+        return False
 
 
 # ---------------------------------------------------------------------------
 # 資料庫查詢（回傳字串，不 print）
 # ---------------------------------------------------------------------------
+
 
 def _connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
@@ -112,7 +143,7 @@ def _connect(db_path: str) -> sqlite3.Connection:
     return conn
 
 
-def _score_bar(score: int, width: int = 8) -> str:
+def _score_bar(score: int | None, width: int = 8) -> str:
     if score is None:
         return ""
     filled = round(score / 100 * width)
@@ -123,15 +154,20 @@ def fmt_top(db_path: str, n: int = 10) -> str:
     conn = _connect(db_path)
     rows = conn.execute(
         "SELECT name, spirit_type, country, expert_score FROM spirits "
-        "WHERE expert_score IS NOT NULL ORDER BY expert_score DESC LIMIT ?", (n,)
+        "WHERE expert_score IS NOT NULL ORDER BY expert_score DESC LIMIT ?",
+        (n,),
     ).fetchall()
+    rows = [dict(r) for r in rows]
     conn.close()
     if not rows:
         return "資料庫尚無資料。"
     lines = [f"🏆 評分 Top {n}\n"]
     for i, r in enumerate(rows, 1):
-        bar = _score_bar(r["expert_score"])
-        lines.append(f"{i:>2}. {r['name']}\n    {r['spirit_type']} | {r['country']}\n    {bar} {r['expert_score']}分\n")
+        score = r.get("expert_score")
+        bar = _score_bar(int(score) if isinstance(score, (int, float)) else None)
+        lines.append(
+            f"{i:>2}. {r['name']}\n    {r['spirit_type']} | {r['country']}\n    {bar} {r['expert_score']}分\n"
+        )
     return "\n".join(lines)
 
 
@@ -144,19 +180,23 @@ def fmt_search(db_path: str, keyword: str, limit: int = 10) -> str:
         "ORDER BY expert_score DESC NULLS LAST LIMIT ?",
         (kw, kw, kw, limit),
     ).fetchall()
+    rows = [dict(r) for r in rows]
     conn.close()
     if not rows:
         return f"找不到符合「{keyword}」的烈酒。"
     lines = [f"🔍 搜尋「{keyword}」：{len(rows)} 筆\n"]
     for r in rows:
-        score = f"{r['expert_score']}分" if r["expert_score"] else "無評分"
+        score_value = r.get("expert_score")
+        score = f"{score_value}分" if score_value else "無評分"
         lines.append(f"・{r['name']}\n  {r['spirit_type']} | {r['country']} | {score}")
     return "\n".join(lines)
 
 
 def fmt_info(db_path: str, name: str) -> str:
     conn = _connect(db_path)
-    row = conn.execute("SELECT * FROM spirits WHERE name LIKE ? LIMIT 1", (f"%{name}%",)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM spirits WHERE name LIKE ? LIMIT 1", (f"%{name}%",)
+    ).fetchone()
     if not row:
         conn.close()
         return f"找不到符合「{name}」的烈酒。"
@@ -174,35 +214,44 @@ def fmt_info(db_path: str, name: str) -> str:
         f"社群評分：{row.get('community_score') or '—'}",
         f"評論數：{row.get('review_count') or '—'}",
     ]
-    if row.get("tasting_notes"):
-        lines.append(f"\n👃 {row['tasting_notes'][:150]}")
+    tasting_notes = row.get("tasting_notes")
+    if isinstance(tasting_notes, str) and tasting_notes:
+        lines.append(f"\n👃 {tasting_notes[:150]}")
 
     flavors = conn.execute(
         "SELECT flavor_name, flavor_value FROM flavor_profiles "
         "WHERE spirit_id = ? ORDER BY flavor_value DESC LIMIT 8",
         (row["id"],),
     ).fetchall()
+    flavors = [dict(f) for f in flavors]
     conn.close()
     if flavors:
         lines.append("\n🎨 風味：")
         for f in flavors:
-            bar = "█" * (f["flavor_value"] // 10)
-            lines.append(f"  {f['flavor_name']:12s} {bar} {f['flavor_value']}")
+            value = f.get("flavor_value", 0)
+            bar = "█" * (int(value) // 10)
+            lines.append(f"  {f['flavor_name']:12s} {bar} {value}")
     return "\n".join(lines)
 
 
 def fmt_stats(db_path: str) -> str:
     conn = _connect(db_path)
     total = conn.execute("SELECT COUNT(*) FROM spirits").fetchone()[0]
-    avg = conn.execute("SELECT ROUND(AVG(expert_score),1) FROM spirits WHERE expert_score IS NOT NULL").fetchone()[0]
+    avg = conn.execute(
+        "SELECT ROUND(AVG(expert_score),1) FROM spirits WHERE expert_score IS NOT NULL"
+    ).fetchone()[0]
     hi = conn.execute("SELECT MAX(expert_score) FROM spirits").fetchone()[0]
-    lo = conn.execute("SELECT MIN(expert_score) FROM spirits WHERE expert_score IS NOT NULL").fetchone()[0]
+    lo = conn.execute(
+        "SELECT MIN(expert_score) FROM spirits WHERE expert_score IS NOT NULL"
+    ).fetchone()[0]
     types = conn.execute(
         "SELECT spirit_type, COUNT(*) c FROM spirits GROUP BY spirit_type ORDER BY c DESC LIMIT 6"
     ).fetchall()
     countries = conn.execute(
         "SELECT country, COUNT(*) c FROM spirits WHERE country IS NOT NULL GROUP BY country ORDER BY c DESC LIMIT 5"
     ).fetchall()
+    types = [tuple(r) for r in types]
+    countries = [tuple(r) for r in countries]
     conn.close()
 
     lines = [
@@ -230,28 +279,39 @@ def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -
             "WHERE fp.flavor_name = ? ORDER BY fp.flavor_value DESC LIMIT ?",
             (flavor_name, limit),
         ).fetchall()
+        rows = [dict(r) for r in rows]
         conn.close()
         if not rows:
             return f"找不到風味「{flavor_name}」的資料。"
         lines = [f"🎨 風味「{flavor_name}」排行\n"]
         for i, r in enumerate(rows, 1):
-            bar = "█" * (r["flavor_value"] // 10)
-            lines.append(f"{i:>2}. {r['name']}\n    {bar} {r['flavor_value']} | 專家 {r['expert_score']}分")
+            value = r.get("flavor_value", 0)
+            bar = "█" * (int(value) // 10)
+            lines.append(
+                f"{i:>2}. {r['name']}\n    {bar} {value} | 專家 {r['expert_score']}分"
+            )
         return "\n".join(lines)
     else:
         rows = conn.execute(
             "SELECT flavor_name, ROUND(AVG(flavor_value),0) avg "
             "FROM flavor_profiles GROUP BY flavor_name ORDER BY avg DESC"
         ).fetchall()
+        rows = [dict(r) for r in rows]
         conn.close()
         lines = ["🎨 風味維度平均值\n"]
         for r in rows:
-            bar = "█" * (int(r["avg"]) // 10)
-            lines.append(f"  {r['flavor_name']:14s} {bar} {int(r['avg'])}")
+            avg_value = r.get("avg", 0)
+            bar = "█" * (int(avg_value) // 10)
+            lines.append(f"  {r['flavor_name']:14s} {bar} {int(avg_value)}")
         return "\n".join(lines)
 
 
-def fmt_list(db_path: str, country: str | None = None, min_score: int | None = None, limit: int = 10) -> str:
+def fmt_list(
+    db_path: str,
+    country: str | None = None,
+    min_score: int | None = None,
+    limit: int = 10,
+) -> str:
     conn = _connect(db_path)
     conds, params = [], []
     if country:
@@ -265,8 +325,10 @@ def fmt_list(db_path: str, country: str | None = None, min_score: int | None = N
     params.append(limit)
     rows = conn.execute(
         f"SELECT name, spirit_type, country, expert_score FROM spirits{where} "
-        f"ORDER BY expert_score DESC NULLS LAST LIMIT ?", params
+        f"ORDER BY expert_score DESC NULLS LAST LIMIT ?",
+        params,
     ).fetchall()
+    rows = [dict(r) for r in rows]
     conn.close()
     if not rows:
         return "找不到符合條件的烈酒。"
@@ -278,7 +340,8 @@ def fmt_list(db_path: str, country: str | None = None, min_score: int | None = N
     title = "・".join(title_parts) if title_parts else "全部"
     lines = [f"📋 烈酒列表（{title}，共 {total} 筆）\n"]
     for r in rows:
-        score = f"{r['expert_score']}分" if r["expert_score"] else "無評分"
+        score_value = r.get("expert_score")
+        score = f"{score_value}分" if score_value else "無評分"
         lines.append(f"・{r['name']}\n  {r['spirit_type']} | {r['country']} | {score}")
     if total > limit:
         lines.append(f"\n（顯示前 {limit} 筆，共 {total} 筆）")
@@ -305,7 +368,8 @@ def fmt_help() -> str:
 # 指令解析
 # ---------------------------------------------------------------------------
 
-def parse_command(text: str) -> tuple[str, list]:
+
+def parse_command(text: str) -> tuple[str, list[str | int | None]]:
     """將 LINE 訊息解析為 (command, args)。"""
     text = text.strip()
     lower = text.lower()
@@ -354,6 +418,7 @@ def parse_command(text: str) -> tuple[str, list]:
 # Flask App
 # ---------------------------------------------------------------------------
 
+
 def create_app(
     db_path: str = DB_DEFAULT,
     channel_secret: str | None = None,
@@ -363,16 +428,29 @@ def create_app(
     _channel_secret = channel_secret or os.getenv("LINE_CHANNEL_SECRET", "")
     _channel_id = channel_id or os.getenv("LINE_CHANNEL_ID", "")
 
+    @app.route("/health", methods=["GET"])
+    def health():
+        return {
+            "status": "ok",
+            "db_exists": Path(db_path).exists(),
+            "token_cached": _token_cache.get("token") is not None,
+        }, 200
+
     @app.route("/webhook", methods=["POST"])
     def webhook():
         body = request.get_data()
-        signature = request.headers.get("X-Line-Signature", "")
+        data = request.get_json(silent=True)
 
+        if not data or not data.get("events"):
+            if body and data is None:
+                logger.warning("收到無法解析的 JSON")
+            return "OK", 200
+
+        signature = request.headers.get("X-Line-Signature", "")
         if not _verify_signature(body, signature, _channel_secret):
-            logger.warning("簽名驗證失敗")
+            logger.warning("簽名驗證失敗（來源 IP：%s）", request.remote_addr)
             abort(400)
 
-        data = request.get_json(silent=True) or {}
         for event in data.get("events", []):
             if event.get("type") != "message":
                 continue
@@ -385,9 +463,10 @@ def create_app(
 
             response = _handle(user_text, db_path)
 
-            token = _get_access_token(_channel_id, _channel_secret)
+            token = _get_cached_token(_channel_id, _channel_secret)
             if token:
-                _reply(reply_token, response, token)
+                if not _reply(reply_token, response, token):
+                    logger.error("回覆訊息失敗")
             else:
                 logger.error("無法取得 Access Token，無法回覆")
 
@@ -399,6 +478,7 @@ def create_app(
 def _handle(text: str, db_path: str) -> str:
     """解析指令並回傳回覆文字。"""
     if not Path(db_path).exists():
+        logger.warning("資料庫不存在：%s", db_path)
         return "⚠️ 資料庫不存在，請先執行：python run.py --mode test --output sqlite"
 
     command, args = parse_command(text)
@@ -407,22 +487,38 @@ def _handle(text: str, db_path: str) -> str:
         if command == "help":
             return fmt_help()
         elif command == "top":
-            return fmt_top(db_path, args[0] if args else 10)
+            raw_n = args[0] if args else 10
+            if isinstance(raw_n, int):
+                n = raw_n
+            elif isinstance(raw_n, str) and raw_n.isdigit():
+                n = int(raw_n)
+            else:
+                n = 10
+            return fmt_top(db_path, n)
         elif command == "search":
-            return fmt_search(db_path, args[0])
+            keyword = str(args[0])
+            return fmt_search(db_path, keyword)
         elif command == "info":
-            return fmt_info(db_path, args[0])
+            name = str(args[0])
+            return fmt_info(db_path, name)
         elif command == "stats":
             return fmt_stats(db_path)
         elif command == "flavors":
-            return fmt_flavors(db_path, args[0] if args else None)
+            flavor_name = str(args[0]) if args else None
+            return fmt_flavors(db_path, flavor_name)
         elif command == "list":
-            return fmt_list(db_path, args[0] if len(args) > 0 else None, args[1] if len(args) > 1 else None)
+            raw_country = args[0] if len(args) > 0 else None
+            country = str(raw_country) if raw_country is not None else None
+            raw_score = args[1] if len(args) > 1 else None
+            if isinstance(raw_score, int):
+                min_score = raw_score
+            elif isinstance(raw_score, str) and raw_score.isdigit():
+                min_score = int(raw_score)
+            else:
+                min_score = None
+            return fmt_list(db_path, country, min_score)
         else:
-            return (
-                f"不認識指令「{text}」。\n"
-                "傳送「說明」查看所有指令。"
-            )
+            return f"不認識指令「{text}」。\n傳送「說明」查看所有指令。"
     except Exception as exc:
         logger.error("處理指令失敗：%s", exc)
         return "⚠️ 查詢時發生錯誤，請稍後再試。"
@@ -450,5 +546,11 @@ DB   : {DB_DEFAULT}
 注意：macOS AirPlay Receiver 會佔用 port 5000
       可在系統設定 → 通用 → AirDrop 與接力 中關閉，或使用預設 port 8000
 """)
+    _secret = os.getenv("LINE_CHANNEL_SECRET", "")
+    _id = os.getenv("LINE_CHANNEL_ID", "")
+    if not _secret or not _id:
+        logger.error("缺少必要環境變數：LINE_CHANNEL_SECRET / LINE_CHANNEL_ID")
+        sys.exit(1)
+    logger.info("環境變數檢查通過")
     app = create_app()
     app.run(host="0.0.0.0", port=port, debug=False)
