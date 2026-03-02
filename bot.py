@@ -164,13 +164,16 @@ def fmt_top(db_path: str, n: int = 10) -> str:
     conn.close()
     if not rows:
         return "資料庫尚無資料。"
-    lines: list[str] = [f"🏆 評分 Top {n}\n"]
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    lines: list[str] = [f"🏆 評分 Top {n}", "━" * 20]
     for i, r in enumerate(rows, 1):
         score = r.get("expert_score")
         bar = _score_bar(int(score) if isinstance(score, (int, float)) else None)
-        lines.append(
-            f"{i:>2}. {r['name']}\n    {r['spirit_type']} | {r['country']}\n    {bar} {r['expert_score']}分\n"
-        )
+        rank = medals.get(i, f"{i:>2}.")
+        lines.append(f"{rank} {r['name']}")
+        lines.append(f"   {r['spirit_type']} | {r['country']}")
+        lines.append(f"   {bar} {r['expert_score']}分")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -190,11 +193,15 @@ def fmt_search(db_path: str, keyword: str, limit: int = 10) -> str:
     conn.close()
     if not rows:
         return f"找不到符合「{keyword}」的烈酒。"
-    lines: list[str] = [f"🔍 搜尋「{keyword}」：{len(rows)} 筆\n"]
+    lines: list[str] = [f"🔍 搜尋「{keyword}」：{len(rows)} 筆", "─" * 20]
     for r in rows:
         score_value = r.get("expert_score")
-        score = f"{score_value}分" if score_value else "無評分"
-        lines.append(f"・{r['name']}\n  {r['spirit_type']} | {r['country']} | {score}")
+        bar = _score_bar(int(score_value) if isinstance(score_value, (int, float)) else None)
+        score = f"{bar} {score_value}分" if score_value else "無評分"
+        lines.append(f"・{r['name']}")
+        lines.append(f"  {r['spirit_type']} | {r['country']}")
+        lines.append(f"  {score}")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -219,20 +226,23 @@ def fmt_info(db_path: str, name: str) -> str:
     )
     lines: list[str] = [
         f"🥃 {row['name']}",
-        "─" * 30,
-        f"類型：{row.get('spirit_type') or '—'}",
-        f"品牌：{row.get('brand') or '—'}",
-        f"產地：{row.get('country') or '—'}",
-        f"年份：{row.get('age') or '—'}",
-        f"ABV：{row.get('abv') or '—'}%",
-        f"價位：{price_text}",
-        f"專家評分：{score_text} {score_bar}",
-        f"社群評分：{row.get('community_score') or '—'}",
-        f"評論數：{row.get('review_count') or '—'}",
+        "━" * 20,
+        "",
+        f"類型　{row.get('spirit_type') or '—'}",
+        f"品牌　{row.get('brand') or '—'}",
+        f"產地　{row.get('country') or '—'}",
+        f"年份　{row.get('age') or '—'}",
+        f"ABV 　{row.get('abv') or '—'}%",
+        f"價位　{price_text}",
+        "",
+        f"專家評分　{score_text} {score_bar}",
+        f"社群評分　{row.get('community_score') or '—'}",
+        f"評論數　　{row.get('review_count') or '—'}",
     ]
     tasting_notes = row.get("tasting_notes")
     if isinstance(tasting_notes, str) and tasting_notes:
-        lines.append(f"\n👃 {tasting_notes[:150]}")
+        lines.append("")
+        lines.append(f"👃 {tasting_notes[:150]}")
 
     flavors = cast(
         list[sqlite3.Row],
@@ -245,11 +255,14 @@ def fmt_info(db_path: str, name: str) -> str:
     flavors = [dict(f) for f in flavors]
     conn.close()
     if flavors:
-        lines.append("\n🎨 風味：")
+        lines.append("")
+        lines.append("🎨 風味圖譜")
+        lines.append("─" * 20)
         for f in flavors:
             value = f.get("flavor_value", 0)
             bar = "█" * (int(value) // 10)
-            lines.append(f"  {f['flavor_name']:12s} {bar} {value}")
+            pct = f"{int(value)}%"
+            lines.append(f"  {f['flavor_name']:12s} {bar} {pct}")
     return "\n".join(lines)
 
 
@@ -281,17 +294,22 @@ def fmt_stats(db_path: str) -> str:
 
     lines: list[str] = [
         "📊 資料庫統計",
-        "─" * 25,
-        f"總筆數：{total}",
-        f"平均分：{avg}",
-        f"分數區間：{lo} ~ {hi}",
-        "\n📋 主要類型：",
+        "━" * 20,
+        "",
+        f"  總筆數　　{total}",
+        f"  平均分　　{avg}",
+        f"  分數區間　{lo} ~ {hi}",
+        "",
+        "📋 主要類型",
+        "─" * 20,
     ]
     for r in types:
-        lines.append(f"  {r[0]}：{r[1]}筆")
-    lines.append("\n🌍 主要產地：")
+        lines.append(f"  {r[0]}　{r[1]}筆")
+    lines.append("")
+    lines.append("🌍 主要產地")
+    lines.append("─" * 20)
     for r in countries:
-        lines.append(f"  {r[0]}：{r[1]}筆")
+        lines.append(f"  {r[0]}　{r[1]}筆")
     return "\n".join(lines)
 
 
@@ -311,13 +329,14 @@ def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -
         conn.close()
         if not rows:
             return f"找不到風味「{flavor_name}」的資料。"
-        lines: list[str] = [f"🎨 風味「{flavor_name}」排行\n"]
+        lines: list[str] = [f"🎨 風味「{flavor_name}」排行", "━" * 20]
         for i, r in enumerate(rows, 1):
             value = r.get("flavor_value", 0)
             bar = "█" * (int(value) // 10)
-            lines.append(
-                f"{i:>2}. {r['name']}\n    {bar} {value} | 專家 {r['expert_score']}分"
-            )
+            pct = f"{int(value)}%"
+            lines.append(f"{i:>2}. {r['name']}")
+            lines.append(f"    {bar} {pct} | 專家 {r['expert_score']}分")
+            lines.append("")
         return "\n".join(lines)
     else:
         rows = cast(
@@ -329,11 +348,12 @@ def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -
         )
         rows = [dict(r) for r in rows]
         conn.close()
-        lines: list[str] = ["🎨 風味維度平均值\n"]
+        lines: list[str] = ["🎨 風味維度平均值", "━" * 20]
         for r in rows:
             avg_value = r.get("avg", 0)
             bar = "█" * (int(avg_value) // 10)
-            lines.append(f"  {r['flavor_name']:14s} {bar} {int(avg_value)}")
+            pct = f"{int(avg_value)}%"
+            lines.append(f"  {r['flavor_name']:14s} {bar} {pct}")
         return "\n".join(lines)
 
 
@@ -373,30 +393,41 @@ def fmt_list(
     if min_score:
         title_parts.append(f"{min_score}分以上")
     title = "・".join(title_parts) if title_parts else "全部"
-    lines: list[str] = [f"📋 烈酒列表（{title}，共 {total} 筆）\n"]
+    lines: list[str] = [f"📋 烈酒列表（{title}，共 {total} 筆）", "─" * 20]
     for r in rows:
         score_value = r.get("expert_score")
-        score = f"{score_value}分" if score_value else "無評分"
-        lines.append(f"・{r['name']}\n  {r['spirit_type']} | {r['country']} | {score}")
+        bar = _score_bar(int(score_value) if isinstance(score_value, (int, float)) else None)
+        score = f"{bar} {score_value}分" if score_value else "無評分"
+        lines.append(f"・{r['name']}")
+        lines.append(f"  {r['spirit_type']} | {r['country']}")
+        lines.append(f"  {score}")
+        lines.append("")
     if total > limit:
-        lines.append(f"\n（顯示前 {limit} 筆，共 {total} 筆）")
+        lines.append(f"（顯示前 {limit} 筆，共 {total} 筆）")
     return "\n".join(lines)
 
 
 def fmt_help() -> str:
-    return (
-        "🥃 Distiller 查詢指令\n"
-        "────────────────\n"
-        "top [N]\n  評分最高前 N 筆（預設 10）\n\n"
-        "搜尋 <關鍵字>\n  搜尋品名、品牌、描述\n\n"
-        "詳情 <名稱>\n  完整資訊與風味圖譜\n\n"
-        "統計\n  資料庫統計摘要\n\n"
-        "風味\n  所有風味維度平均\n\n"
-        "風味 <名稱>\n  例：風味 smoky\n\n"
-        "列表\n  列出前 10 筆\n\n"
-        "列表 <產地>\n  例：列表 Japan\n\n"
-        "列表 <產地> <最低分>\n  例：列表 Scotland 95"
-    )
+    return "\n".join([
+        "🥃 Distiller 查詢指令",
+        "━" * 20,
+        "",
+        "🔎 搜尋與瀏覽",
+        "  top [N]　　　　　　評分最高前 N 筆（預設 10）",
+        "  搜尋 <關鍵字>　　　搜尋品名、品牌、描述",
+        "  詳情 <名稱>　　　　完整資訊與風味圖譜",
+        "  列表　　　　　　　　列出前 10 筆",
+        "  列表 <產地>　　　　例：列表 Japan",
+        "  列表 <產地> <分數>　例：列表 Scotland 95",
+        "",
+        "📊 統計與風味",
+        "  統計　　　　　　　　資料庫統計摘要",
+        "  風味　　　　　　　　所有風味維度平均",
+        "  風味 <名稱>　　　　例：風味 smoky",
+        "",
+        "❓ 其他",
+        "  說明　　　　　　　　顯示本說明",
+    ])
 
 
 # ---------------------------------------------------------------------------

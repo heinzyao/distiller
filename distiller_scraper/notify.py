@@ -12,6 +12,7 @@ LINE Messaging API 通知模組
 
 import logging
 import os
+from datetime import datetime
 
 import requests
 
@@ -93,22 +94,44 @@ class LineNotifier:
         total = stats.get("總記錄數", stats.get("total_records", "?"))
         failed = stats.get("失敗 URL 數", stats.get("failed_urls", "?"))
         categories = stats.get("類別分布", stats.get("category_distribution", {}))
-        cat_summary = "、".join(f"{k}: {v}" for k, v in categories.items())
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        text = (
-            "✅ Distiller 爬蟲執行完成\n"
-            f"模式：{mode}\n"
-            f"總筆數：{total}\n"
-            f"失敗數：{failed}\n"
-            f"類別：{cat_summary or '無'}"
-        )
+        lines = [
+            "✅ Distiller 爬蟲執行完成",
+            "━" * 20,
+            f"⏰ {now}",
+            "",
+            f"  模式　　{mode}",
+            f"  總筆數　{total}",
+            f"  失敗數　{failed}",
+        ]
+        if categories:
+            cat_total = sum(categories.values()) if all(isinstance(v, (int, float)) for v in categories.values()) else 0
+            lines.append("")
+            lines.append("📋 類別分布")
+            lines.append("─" * 20)
+            for k, v in categories.items():
+                if cat_total > 0 and isinstance(v, (int, float)):
+                    bar_len = round(v / cat_total * 10)
+                    bar = "█" * bar_len + "░" * (10 - bar_len)
+                    lines.append(f"  {k}　{bar} {v}")
+                else:
+                    lines.append(f"  {k}　{v}")
+        else:
+            lines.append(f"  類別　　無")
+
+        text = "\n".join(lines)
         return self.send(text)
 
     def notify_failure(self, mode: str, error: str = "") -> bool:
         """格式化並發送爬取失敗通知。"""
-        text = (
-            "❌ Distiller 爬蟲執行失敗\n"
-            f"模式：{mode}\n"
-            f"錯誤：{error or '未知錯誤，請查看日誌。'}"
-        )
-        return self.send(text)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        lines = [
+            "❌ Distiller 爬蟲執行失敗",
+            "━" * 20,
+            f"⏰ {now}",
+            "",
+            f"  模式　{mode}",
+            f"  錯誤　{error or '未知錯誤，請查看日誌。'}",
+        ]
+        return self.send("\n".join(lines))

@@ -174,8 +174,7 @@ class TestFmtTop:
     def test_contains_names(self, db_path):
         result = fmt_top(db_path, 3)
         assert "Highland Park" in result
-        assert "#1" not in result  # bot 用 1. 格式
-        assert "1." in result
+        assert "🥇" in result  # Top 3 使用獎牌 emoji
 
     def test_respects_limit(self, db_path):
         result = fmt_top(db_path, 2)
@@ -208,7 +207,7 @@ class TestFmtInfo:
 class TestFmtStats:
     def test_output(self, db_path):
         result = fmt_stats(db_path)
-        assert "總筆數：4" in result
+        assert "總筆數" in result and "4" in result
         assert "類型" in result
         assert "產地" in result
 
