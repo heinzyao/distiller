@@ -54,6 +54,30 @@
 
 ---
 
+### 2026-03-02 | OpenCode Sisyphus (Session 3)
+
+**工作內容**：
+1. **排程去重機制完整分析**
+   - 追蹤每日排程（`run_scraper.sh` → `run.py --mode full --output both --use-api`）的完整執行路徑
+   - 確認五層去重機制：`seen_urls` 預載、逐筆跳過、整類跳過、重複率閾值、SQLite upsert
+   - 確認 CSV 輸出僅在單次執行內去重（每次獨立檔案），SQLite 為跨執行唯一去重來源
+   - 結論：每日排程可有效避免重複爬取，已在 DB 中的類別會被快速跳過
+
+2. **文件更新**
+   - `README.md`：新增「排程與去重機制」章節，含五層去重機制對照表
+   - `CHANGELOG.md`：新增 v2.4.1 文件更新紀錄
+   - `AGENTS.md`：記錄本次分析工作
+   - 提交 `.sisyphus/` 工作階段產出物（上一 session 遺留）
+
+**主要變更**：
+- 修改 `README.md`（新增排程去重章節）
+- 修改 `CHANGELOG.md`（新增 v2.4.1）
+- 修改 `AGENTS.md`（新增本次工作紀錄）
+
+**Commit**：`chore(sisyphus)` + `docs`
+
+---
+
 ### 2026-03-02 | OpenCode Atlas Orchestrator
 
 **工作內容**：
@@ -404,4 +428,4 @@ python run.py --mode full
 
 ---
 
-*最後更新：2026-03-02 by OpenCode Atlas Orchestrator*
+*最後更新：2026-03-02 by OpenCode Sisyphus*
