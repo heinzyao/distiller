@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 LINE_TOKEN_URL = "https://api.line.me/v2/oauth/accessToken"
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 
+_SEP = "━" * 20
+_SEP_LIGHT = "─" * 20
+
 
 class LineNotifier:
     """透過 LINE Messaging API 發送推播通知。"""
@@ -34,6 +37,9 @@ class LineNotifier:
         self.channel_id = channel_id if channel_id is not None else os.getenv("LINE_CHANNEL_ID", "")
         self.channel_secret = channel_secret if channel_secret is not None else os.getenv("LINE_CHANNEL_SECRET", "")
         self.user_id = user_id if user_id is not None else os.getenv("LINE_USER_ID", "")
+
+    def _timestamp(self) -> str:
+        return datetime.now().strftime("%Y-%m-%d %H:%M")
 
     def is_configured(self) -> bool:
         """當 channel_id、channel_secret、user_id 皆已設定時回傳 True。"""
@@ -94,12 +100,10 @@ class LineNotifier:
         total = stats.get("總記錄數", stats.get("total_records", "?"))
         failed = stats.get("失敗 URL 數", stats.get("failed_urls", "?"))
         categories = stats.get("類別分布", stats.get("category_distribution", {}))
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-
         lines = [
             "✅ Distiller 爬蟲執行完成",
-            "━" * 20,
-            f"⏰ {now}",
+            _SEP,
+            f"⏰ {self._timestamp()}",
             "",
             f"  模式　　{mode}",
             f"  總筆數　{total}",
@@ -109,7 +113,7 @@ class LineNotifier:
             cat_total = sum(categories.values()) if all(isinstance(v, (int, float)) for v in categories.values()) else 0
             lines.append("")
             lines.append("📋 類別分布")
-            lines.append("─" * 20)
+            lines.append(_SEP_LIGHT)
             for k, v in categories.items():
                 if cat_total > 0 and isinstance(v, (int, float)):
                     bar_len = round(v / cat_total * 10)
@@ -118,18 +122,17 @@ class LineNotifier:
                 else:
                     lines.append(f"  {k}　{v}")
         else:
-            lines.append(f"  類別　　無")
+            lines.append("  類別　　無")
 
         text = "\n".join(lines)
         return self.send(text)
 
     def notify_failure(self, mode: str, error: str = "") -> bool:
         """格式化並發送爬取失敗通知。"""
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
         lines = [
             "❌ Distiller 爬蟲執行失敗",
-            "━" * 20,
-            f"⏰ {now}",
+            _SEP,
+            f"⏰ {self._timestamp()}",
             "",
             f"  模式　{mode}",
             f"  錯誤　{error or '未知錯誤，請查看日誌。'}",
