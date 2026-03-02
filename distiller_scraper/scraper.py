@@ -334,6 +334,7 @@ class DistillerScraperV2:
 
             logger.info(f"[分頁] 開始爬取: {label}")
             pagination_works = False  # 確認分頁是否真的有效
+            db_urls = self.storage.get_existing_urls() if self.storage else set()
 
             for page in range(1, ScraperConfig.MAX_PAGES_PER_QUERY + 1):
                 if len(results) >= max_spirits:
@@ -369,10 +370,18 @@ class DistillerScraperV2:
                 # 第二頁起若無新 URL，判斷已到結尾
                 if page >= 2 and len(new_urls) < ScraperConfig.MIN_NEW_URLS_PER_PAGE:
                     if not pagination_works:
+                        # NEW: Check if category is already fully in DB
+                        if urls_on_page and self.storage and all(u in db_urls for u in urls_on_page):
+                            logger.info("  此類別資料已存在於資料庫，跳過")
+                            break
+                        
                         logger.info("  分頁無效（第二頁無新內容），切換至滾動模式")
                         # fallback: 重新以 Selenium 滾動模式爬第一頁
-                        first_page_urls = self._fetch_spirit_urls_from_page(base_url)
-                        self._scrape_urls(first_page_urls, category, results, max_spirits)
+                        try:
+                            first_page_urls = self._fetch_spirit_urls_from_page(base_url)
+                            self._scrape_urls(first_page_urls, category, results, max_spirits)
+                        except Exception as e:
+                            logger.warning(f"  滾動模式 fallback 失敗: {e}")
                     else:
                         logger.info(f"  第 {page} 頁無新 URL，分頁結束")
                     break
@@ -540,40 +549,44 @@ class DistillerScraperV2:
 
         try:
             for cat_idx, category in enumerate(categories, 1):
-                logger.info(f"\n{'=' * 60}")
-                logger.info(f"類別 {cat_idx}/{len(categories)}: {category}")
-                logger.info(f"{'=' * 60}\n")
-
-                category_results = self.scrape_category(
-                    category,
-                    max_spirits=max_per_category,
-                    use_styles=use_styles,
-                    use_pagination=use_pagination,
-                )
-                self.spirits_data.extend(category_results)
-
-                logger.info(f"類別 {category} 完成: {len(category_results)} 筆")
-
-                if cat_idx < len(categories):
-                    logger.info(f"等待 {ScraperConfig.CATEGORY_DELAY} 秒後繼續...\n")
-                    time.sleep(ScraperConfig.CATEGORY_DELAY)
-
+                try:
+                    logger.info(f"\n{'=' * 60}")
+                    logger.info(f"類別 {cat_idx}/{len(categories)}: {category}")
+                    logger.info(f"{'=' * 60}\n")
+                    
+                    category_results = self.scrape_category(
+                        category,
+                        max_spirits=max_per_category,
+                        use_styles=use_styles,
+                        use_pagination=use_pagination,
+                    )
+                    self.spirits_data.extend(category_results)
+                    
+                    logger.info(f"類別 {category} 完成: {len(category_results)} 筆")
+                    
+                    if cat_idx < len(categories):
+                        logger.info(f"等待 {ScraperConfig.CATEGORY_DELAY} 秒後繼續...\n")
+                        time.sleep(ScraperConfig.CATEGORY_DELAY)
+                except Exception as e:
+                    logger.error(f"類別 {category} 爬取失敗: {e}")
+                    continue
+            
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-
+            
             logger.info(f"\n{'=' * 80}")
             logger.info(f"爬取完成！")
             logger.info(f"總筆數: {len(self.spirits_data)}")
             logger.info(f"失敗 URL 數: {len(self.failed_urls)}")
             logger.info(f"耗時: {duration / 60:.1f} 分鐘")
             logger.info(f"{'=' * 80}\n")
-
+            
             return True
-
+        
         except Exception as e:
             logger.error(f"爬蟲執行時發生錯誤: {e}")
             return False
-
+        
         finally:
             self.close_driver()
 
