@@ -10,7 +10,7 @@
 - 智能分頁爬取，自動偵測停止條件
 - API 端點自動探索，大幅提升爬取速度
 - 多儲存後端：CSV / SQLite / 雙輸出
-- 192 個自動化測試，GitHub Actions CI/CD
+- 259 個自動化測試，GitHub Actions CI/CD
 
 ## 專案結構
 
@@ -22,11 +22,11 @@ Distiller/
 │   ├── config.py              # 爬蟲配置（含分頁常數）
 │   ├── storage.py             # 儲存後端 (SQLiteStorage, CSVStorage)
 │   └── api_client.py          # API 端點探索客戶端
-├── tests/
-│   ├── unit/                  # 單元測試
-│   ├── integration/           # 整合測試（Mock driver）
-│   └── e2e/                   # 端到端測試（需網路）
-├── run.py                     # 執行入口
+├── bot.py                     # LINE Bot（Flask webhook，port 8000）
+├── query.py                   # CLI 查詢工具
+├── scripts/
+│   ├── run_scraper.sh         # 排程爬取腳本
+│   └── run_bot.sh             # Bot 啟動腳本（launchd 用）
 ├── requirements.txt
 ├── AGENTS.md                  # 多代理協作紀錄
 └── CHANGELOG.md               # 變更紀錄
@@ -35,11 +35,10 @@ Distiller/
 ## 安裝
 
 ```bash
-# 建立虛擬環境
-python3 -m venv venv
-source venv/bin/activate
+# 推薦：使用 uv（更快）
+uv sync
 
-# 安裝依賴
+# 或使用 pip
 pip install -r requirements.txt
 ```
 
@@ -91,6 +90,20 @@ python run.py --mode full --output both --db-path spirits.db --use-api
 | `--db-path` | SQLite 資料庫路徑 | `distiller.db` |
 | `--no-pagination` | 停用分頁模式，改用傳統滾動爬取 | 啟用分頁 |
 | `--use-api` | 啟用 API 模式（自動探測端點） | 停用 |
+
+## LINE Bot
+
+`bot.py` 是一個 Flask Webhook 服務（port 8000），接收 LINE 訊息並查詢烈酒資料庫回覆。
+
+```bash
+# 啟動 Bot
+uv run python bot.py
+
+# 健康檢查
+curl http://localhost:8000/health
+```
+
+支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`說明`
 
 ## 測試
 

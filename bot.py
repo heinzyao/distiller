@@ -75,7 +75,7 @@ def _get_access_token(channel_id: str, channel_secret: str) -> str | None:
             timeout=15,
         )
         if resp.status_code == 200:
-            data = cast(object, resp.json())
+            data = resp.json()
             if isinstance(data, dict):
                 token = data.get("access_token")
                 if isinstance(token, str):
@@ -152,16 +152,19 @@ def _score_bar(score: int | None, width: int = 8) -> str:
 
 def fmt_top(db_path: str, n: int = 10) -> str:
     conn = _connect(db_path)
-    rows = conn.execute(
-        "SELECT name, spirit_type, country, expert_score FROM spirits "
-        "WHERE expert_score IS NOT NULL ORDER BY expert_score DESC LIMIT ?",
-        (n,),
-    ).fetchall()
+    rows = cast(
+        list[sqlite3.Row],
+        conn.execute(
+            "SELECT name, spirit_type, country, expert_score FROM spirits "
+            "WHERE expert_score IS NOT NULL ORDER BY expert_score DESC LIMIT ?",
+            (n,),
+        ).fetchall(),
+    )
     rows = [dict(r) for r in rows]
     conn.close()
     if not rows:
         return "資料庫尚無資料。"
-    lines = [f"🏆 評分 Top {n}\n"]
+    lines: list[str] = [f"🏆 評分 Top {n}\n"]
     for i, r in enumerate(rows, 1):
         score = r.get("expert_score")
         bar = _score_bar(int(score) if isinstance(score, (int, float)) else None)
@@ -174,17 +177,20 @@ def fmt_top(db_path: str, n: int = 10) -> str:
 def fmt_search(db_path: str, keyword: str, limit: int = 10) -> str:
     conn = _connect(db_path)
     kw = f"%{keyword}%"
-    rows = conn.execute(
-        "SELECT name, spirit_type, country, expert_score FROM spirits "
-        "WHERE name LIKE ? OR brand LIKE ? OR description LIKE ? "
-        "ORDER BY expert_score DESC NULLS LAST LIMIT ?",
-        (kw, kw, kw, limit),
-    ).fetchall()
+    rows = cast(
+        list[sqlite3.Row],
+        conn.execute(
+            "SELECT name, spirit_type, country, expert_score FROM spirits "
+            "WHERE name LIKE ? OR brand LIKE ? OR description LIKE ? "
+            "ORDER BY expert_score DESC NULLS LAST LIMIT ?",
+            (kw, kw, kw, limit),
+        ).fetchall(),
+    )
     rows = [dict(r) for r in rows]
     conn.close()
     if not rows:
         return f"找不到符合「{keyword}」的烈酒。"
-    lines = [f"🔍 搜尋「{keyword}」：{len(rows)} 筆\n"]
+    lines: list[str] = [f"🔍 搜尋「{keyword}」：{len(rows)} 筆\n"]
     for r in rows:
         score_value = r.get("expert_score")
         score = f"{score_value}分" if score_value else "無評分"
@@ -201,16 +207,26 @@ def fmt_info(db_path: str, name: str) -> str:
         conn.close()
         return f"找不到符合「{name}」的烈酒。"
     row = dict(row)
-    lines = [
+    cost_level = row.get("cost_level")
+    if isinstance(cost_level, int):
+        price_text = "$" * cost_level
+    else:
+        price_text = "—"
+    score_value = row.get("expert_score")
+    score_text = score_value if isinstance(score_value, (int, float)) else "—"
+    score_bar = _score_bar(
+        int(score_value) if isinstance(score_value, (int, float)) else None
+    )
+    lines: list[str] = [
         f"🥃 {row['name']}",
-        f"{'─' * 30}",
+        "─" * 30,
         f"類型：{row.get('spirit_type') or '—'}",
         f"品牌：{row.get('brand') or '—'}",
         f"產地：{row.get('country') or '—'}",
         f"年份：{row.get('age') or '—'}",
         f"ABV：{row.get('abv') or '—'}%",
-        f"價位：{'$' * row['cost_level'] if row.get('cost_level') else '—'}",
-        f"專家評分：{row.get('expert_score') or '—'} {_score_bar(row.get('expert_score'))}",
+        f"價位：{price_text}",
+        f"專家評分：{score_text} {score_bar}",
         f"社群評分：{row.get('community_score') or '—'}",
         f"評論數：{row.get('review_count') or '—'}",
     ]
@@ -218,11 +234,14 @@ def fmt_info(db_path: str, name: str) -> str:
     if isinstance(tasting_notes, str) and tasting_notes:
         lines.append(f"\n👃 {tasting_notes[:150]}")
 
-    flavors = conn.execute(
-        "SELECT flavor_name, flavor_value FROM flavor_profiles "
-        "WHERE spirit_id = ? ORDER BY flavor_value DESC LIMIT 8",
-        (row["id"],),
-    ).fetchall()
+    flavors = cast(
+        list[sqlite3.Row],
+        conn.execute(
+            "SELECT flavor_name, flavor_value FROM flavor_profiles "
+            "WHERE spirit_id = ? ORDER BY flavor_value DESC LIMIT 8",
+            (row["id"],),
+        ).fetchall(),
+    )
     flavors = [dict(f) for f in flavors]
     conn.close()
     if flavors:
@@ -244,27 +263,33 @@ def fmt_stats(db_path: str) -> str:
     lo = conn.execute(
         "SELECT MIN(expert_score) FROM spirits WHERE expert_score IS NOT NULL"
     ).fetchone()[0]
-    types = conn.execute(
-        "SELECT spirit_type, COUNT(*) c FROM spirits GROUP BY spirit_type ORDER BY c DESC LIMIT 6"
-    ).fetchall()
-    countries = conn.execute(
-        "SELECT country, COUNT(*) c FROM spirits WHERE country IS NOT NULL GROUP BY country ORDER BY c DESC LIMIT 5"
-    ).fetchall()
+    types = cast(
+        list[sqlite3.Row],
+        conn.execute(
+            "SELECT spirit_type, COUNT(*) c FROM spirits GROUP BY spirit_type ORDER BY c DESC LIMIT 6"
+        ).fetchall(),
+    )
+    countries = cast(
+        list[sqlite3.Row],
+        conn.execute(
+            "SELECT country, COUNT(*) c FROM spirits WHERE country IS NOT NULL GROUP BY country ORDER BY c DESC LIMIT 5"
+        ).fetchall(),
+    )
     types = [tuple(r) for r in types]
     countries = [tuple(r) for r in countries]
     conn.close()
 
-    lines = [
-        f"📊 資料庫統計",
-        f"{'─' * 25}",
+    lines: list[str] = [
+        "📊 資料庫統計",
+        "─" * 25,
         f"總筆數：{total}",
         f"平均分：{avg}",
         f"分數區間：{lo} ~ {hi}",
-        f"\n📋 主要類型：",
+        "\n📋 主要類型：",
     ]
     for r in types:
         lines.append(f"  {r[0]}：{r[1]}筆")
-    lines.append(f"\n🌍 主要產地：")
+    lines.append("\n🌍 主要產地：")
     for r in countries:
         lines.append(f"  {r[0]}：{r[1]}筆")
     return "\n".join(lines)
@@ -273,17 +298,20 @@ def fmt_stats(db_path: str) -> str:
 def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -> str:
     conn = _connect(db_path)
     if flavor_name:
-        rows = conn.execute(
-            "SELECT s.name, fp.flavor_value, s.expert_score "
-            "FROM flavor_profiles fp JOIN spirits s ON s.id = fp.spirit_id "
-            "WHERE fp.flavor_name = ? ORDER BY fp.flavor_value DESC LIMIT ?",
-            (flavor_name, limit),
-        ).fetchall()
+        rows = cast(
+            list[sqlite3.Row],
+            conn.execute(
+                "SELECT s.name, fp.flavor_value, s.expert_score "
+                "FROM flavor_profiles fp JOIN spirits s ON s.id = fp.spirit_id "
+                "WHERE fp.flavor_name = ? ORDER BY fp.flavor_value DESC LIMIT ?",
+                (flavor_name, limit),
+            ).fetchall(),
+        )
         rows = [dict(r) for r in rows]
         conn.close()
         if not rows:
             return f"找不到風味「{flavor_name}」的資料。"
-        lines = [f"🎨 風味「{flavor_name}」排行\n"]
+        lines: list[str] = [f"🎨 風味「{flavor_name}」排行\n"]
         for i, r in enumerate(rows, 1):
             value = r.get("flavor_value", 0)
             bar = "█" * (int(value) // 10)
@@ -292,13 +320,16 @@ def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -
             )
         return "\n".join(lines)
     else:
-        rows = conn.execute(
-            "SELECT flavor_name, ROUND(AVG(flavor_value),0) avg "
-            "FROM flavor_profiles GROUP BY flavor_name ORDER BY avg DESC"
-        ).fetchall()
+        rows = cast(
+            list[sqlite3.Row],
+            conn.execute(
+                "SELECT flavor_name, ROUND(AVG(flavor_value),0) avg "
+                "FROM flavor_profiles GROUP BY flavor_name ORDER BY avg DESC"
+            ).fetchall(),
+        )
         rows = [dict(r) for r in rows]
         conn.close()
-        lines = ["🎨 風味維度平均值\n"]
+        lines: list[str] = ["🎨 風味維度平均值\n"]
         for r in rows:
             avg_value = r.get("avg", 0)
             bar = "█" * (int(avg_value) // 10)
@@ -313,7 +344,8 @@ def fmt_list(
     limit: int = 10,
 ) -> str:
     conn = _connect(db_path)
-    conds, params = [], []
+    conds: list[str] = []
+    params: list[object] = []
     if country:
         conds.append("country LIKE ?")
         params.append(f"%{country}%")
@@ -323,11 +355,14 @@ def fmt_list(
     where = " WHERE " + " AND ".join(conds) if conds else ""
     total = conn.execute(f"SELECT COUNT(*) FROM spirits{where}", params).fetchone()[0]
     params.append(limit)
-    rows = conn.execute(
-        f"SELECT name, spirit_type, country, expert_score FROM spirits{where} "
-        f"ORDER BY expert_score DESC NULLS LAST LIMIT ?",
-        params,
-    ).fetchall()
+    rows = cast(
+        list[sqlite3.Row],
+        conn.execute(
+            f"SELECT name, spirit_type, country, expert_score FROM spirits{where} "
+            f"ORDER BY expert_score DESC NULLS LAST LIMIT ?",
+            params,
+        ).fetchall(),
+    )
     rows = [dict(r) for r in rows]
     conn.close()
     if not rows:
@@ -338,7 +373,7 @@ def fmt_list(
     if min_score:
         title_parts.append(f"{min_score}分以上")
     title = "・".join(title_parts) if title_parts else "全部"
-    lines = [f"📋 烈酒列表（{title}，共 {total} 筆）\n"]
+    lines: list[str] = [f"📋 烈酒列表（{title}，共 {total} 筆）\n"]
     for r in rows:
         score_value = r.get("expert_score")
         score = f"{score_value}分" if score_value else "無評分"

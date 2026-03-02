@@ -2,6 +2,32 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.4.0] - 2026-03-02
+
+### 修復
+- **LINE Bot 7 個靜默失敗點全面修復**：Bot 完全不回覆問題根治
+  - 簽名驗證失敗日誌加入來源 IP
+  - JSON 解析失敗時記錄 WARNING
+  - `_reply()` 改為回傳 `bool`（成功 True、失敗 False），記錄失敗詳情
+  - DB 不存在時記錄 WARNING
+- **`_reply()` 非 200 / 網路錯誤**：回傳 `False` 並記錄 `resp.text[:200]` 或例外訊息
+- **爬蟲分頁容錯修復**：3 個連鎖崩潰 Bug 根治
+  - Bug 3：DB 已有資料時 100% 重複率誤判「分頁無效」→ 快照 DB URL，全部重複時優雅跳過並 break
+  - Bug 1：未保護的滾動 fallback → try/except 包裝，Selenium timeout 不再崩潰整支程式
+  - Bug 2：單一類別失敗拖垮全部 → try/except 移至迴圈內部，實現 per-category 錯誤隔離
+
+### 新增
+- **OAuth Token 快取**（`_get_cached_token()`）：23 小時 TTL，60 秒安全邊際自動更新，避免每次回覆重新取得 Token
+- **`GET /health` 端點**：回傳 `{"status": "ok", "db_exists": bool, "token_cached": bool}`
+- **Webhook 驗證 Probe 支援**：LINE 空事件陣列驗證請求直接回 200，不做簽名檢查
+- **啟動環境變數驗證**：`__main__` 缺少 `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ID` 時 `sys.exit(1)`
+- **17 個新單元測試**（TestTokenCache、TestHealthCheck、TestWebhookVerificationProbe、TestReplyReturnValue、TestDbMissingLog）
+- **`tests/unit/conftest.py`**：autouse fixture 隔離各測試的 token 快取狀態
+
+### 變更
+- `scripts/run_bot.sh`：從 `venv/bin/python` 遷移至 `uv run python bot.py`
+- `com.distiller.bot.plist`：PATH 新增 `/Users/Henry/.local/bin`（uv 所在路徑）
+- **總計：259 個單元測試全數通過**（原 242 個 + 17 個新增）
 ## [2.3.1] - 2026-03-01
 
 ### 修復
