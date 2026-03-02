@@ -1,6 +1,6 @@
 {
-  "active_plan": "/Users/Henry/Project/Distiller/.sisyphus/plans/scraper-resilience-fix.md",
-  "started_at": "2026-03-02T02:09:47.346Z",
+  "active_plan": "/Users/Henry/Project/Distiller/.sisyphus/plans/line-bot-resilience.md",
+  "started_at": "2026-03-02T05:10:38.318Z",
   "session_ids": ["ses_353b61b58ffeygmkcTTzylarQx"],
-  "plan_name": "scraper-resilience-fix"
+  "plan_name": "line-bot-resilience"
 }

@@ -1,0 +1,29 @@
+=== run_bot.sh Migration Evidence ===
+Task: Migrate from venv/bin/python to uv run python
+
+File: /Users/Henry/Project/Distiller/scripts/run_bot.sh
+
+Verification Results:
+=====================
+
+1. venv reference count check:
+   Command: grep -c 'venv' scripts/run_bot.sh
+   Output: 0
+   Status: ✓ PASS (no venv references remain)
+
+2. uv run command verification:
+   Command: grep 'uv run' scripts/run_bot.sh
+   Output: exec uv run python bot.py
+   Status: ✓ PASS (correct command found)
+
+3. Bash syntax validation:
+   Command: bash -n scripts/run_bot.sh
+   Output: ✓ Bash syntax valid
+   Status: ✓ PASS
+
+Changes Made:
+==============
+- Removed line: VENV_PYTHON="$PROJECT_DIR/venv/bin/python"
+- Changed: exec "$VENV_PYTHON" bot.py → exec uv run python bot.py
+
+All verifications passed successfully.
