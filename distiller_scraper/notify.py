@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 LINE_TOKEN_URL = "https://api.line.me/v2/oauth/accessToken"
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 
-_SEP = "━" * 20
-_SEP_LIGHT = "─" * 20
+_SEP = "━" * 16
+_SEP_LIGHT = "─" * 16
 
 
 class LineNotifier:

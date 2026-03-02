@@ -54,8 +54,8 @@ LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 DB_DEFAULT = "distiller.db"
 MSG_LIMIT = 4900  # LINE 單則訊息字元上限
 
-_SEP = "━" * 20
-_SEP_LIGHT = "─" * 20
+_SEP = "━" * 16
+_SEP_LIGHT = "─" * 16
 _MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
 
 _token_cache: dict[str, str | float] = {}
@@ -266,9 +266,9 @@ def fmt_info(db_path: str, name: str) -> str:
         lines.append(_SEP_LIGHT)
         for f in flavors:
             value = f.get("flavor_value", 0)
-            bar = "█" * (int(value) // 10)
+            bar = _score_bar(int(value), width=6)
             pct = f"{int(value)}%"
-            lines.append(f"  {f['flavor_name']:12s} {bar} {pct}")
+            lines.append(f"  {f['flavor_name']}  {bar} {pct}")
     return "\n".join(lines)
 
 
@@ -338,7 +338,7 @@ def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -
         lines: list[str] = [f"🎨 風味「{flavor_name}」排行", _SEP]
         for i, r in enumerate(rows, 1):
             value = r.get("flavor_value", 0)
-            bar = "█" * (int(value) // 10)
+            bar = _score_bar(int(value), width=6)
             pct = f"{int(value)}%"
             lines.append(f"{i:>2}. {r['name']}")
             lines.append(f"    {bar} {pct} | 專家 {r['expert_score']}分")
@@ -357,9 +357,9 @@ def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -
         lines: list[str] = ["🎨 風味維度平均值", _SEP]
         for r in rows:
             avg_value = r.get("avg", 0)
-            bar = "█" * (int(avg_value) // 10)
+            bar = _score_bar(int(avg_value), width=6)
             pct = f"{int(avg_value)}%"
-            lines.append(f"  {r['flavor_name']:14s} {bar} {pct}")
+            lines.append(f"  {r['flavor_name']}  {bar} {pct}")
         return "\n".join(lines)
 
 
@@ -417,20 +417,21 @@ def fmt_help() -> str:
         _SEP,
         "",
         "🔎 搜尋與瀏覽",
-        "  top [N]　　　　　　評分最高前 N 筆（預設 10）",
-        "  搜尋 <關鍵字>　　　搜尋品名、品牌、描述",
-        "  詳情 <名稱>　　　　完整資訊與風味圖譜",
-        "  列表　　　　　　　　列出前 10 筆",
-        "  列表 <產地>　　　　例：列表 Japan",
-        "  列表 <產地> <分數>　例：列表 Scotland 95",
+        "top [N]",
+        "  評分最高前 N 筆（預設 10）",
+        "搜尋 <關鍵字>",
+        "  搜尋品名、品牌、描述",
+        "詳情 <名稱>",
+        "  完整資訊與風味圖譜",
+        "列表 [產地] [分數]",
+        "  例：列表 Japan｜列表 Scotland 95",
         "",
         "📊 統計與風味",
-        "  統計　　　　　　　　資料庫統計摘要",
-        "  風味　　　　　　　　所有風味維度平均",
-        "  風味 <名稱>　　　　例：風味 smoky",
+        "統計  資料庫統計摘要",
+        "風味 [名稱]  維度排行",
+        "  例：風味 smoky",
         "",
-        "❓ 其他",
-        "  說明　　　　　　　　顯示本說明",
+        "❓ 說明  顯示本說明",
     ])
 
 
