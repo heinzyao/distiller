@@ -19,6 +19,41 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-03-02 | OpenCode Atlas Orchestrator (Session 2)
+
+**工作內容**：
+1. **LINE Bot 全面容錯強化：7 個靜默失敗點修復 + 基礎設施遷移**
+   - 根因分析：Bot 對每則訊息重新取得 OAuth Token（2秒逾時風險）、空事件陣列觸發 400、`_reply()` 回傳 None 無法知曉失敗
+   - **Failure Point 1**：簽名驗證失敗日誌加入來源 IP
+   - **Failure Point 2**：JSON 解析失敗記錄 WARNING
+   - **Failure Point 4**：OAuth Token 改用快取（23小時 TTL，60秒安全邊際），避免每次請求重取
+   - **Failure Point 5**：DB 不存在時記錄 WARNING
+   - **Failure Point 6 & 7**：`_reply()` 改為回傳 `bool`（成功 True，失敗 False），記錄回應內容
+   - **Webhook 驗證 Probe**：空事件陣列（LINE 驗證請求）直接回 200，不做簽名檢查
+   - **Health Check**：新增 `GET /health` 端點，回傳 `{status, db_exists, token_cached}`
+   - **啟動驗證**：`__main__` 新增環境變數檢查，缺少憑證時 `sys.exit(1)`
+   - **基礎設施**：`run_bot.sh` 從 `venv/bin/python` 遷移至 `uv run`；`com.distiller.bot.plist` PATH 更新加入 `/Users/Henry/.local/bin`
+
+2. **新增 17 個單元測試**
+   - TestTokenCache（6 個）：首次取得、快取命中、過期重取、即將過期重取、失敗不填快取、成功後快取驗證
+   - TestHealthCheck（5 個）：200 回應、必要欄位、DB 存在、token 未快取、token 已快取
+   - TestWebhookVerificationProbe（2 個）：無簽名空事件回 200、格式錯誤 JSON 回 200
+   - TestReplyReturnValue（3 個）：HTTP 200 回 True、非 200 回 False、網路錯誤回 False
+   - TestDbMissingLog（1 個）：DB 不存在時記錄警告
+   - 新增 `tests/unit/conftest.py`：autouse fixture 清除測試間 token 快取狀態
+
+**主要變更**：
+- 修改 `bot.py`（+180/-42 行，外科手術式強化）
+- 修改 `scripts/run_bot.sh`（uv 遷移）
+- 修改 `com.distiller.bot.plist`（PATH 更新）
+- 修改 `tests/unit/test_bot.py`（+17 個測試）
+- 新增 `tests/unit/conftest.py`（快取隔離 fixture）
+- **總計：259 個單元測試全數通過**
+
+**Commit**：`ab40caf`
+
+---
+
 ### 2026-03-02 | OpenCode Atlas Orchestrator
 
 **工作內容**：
