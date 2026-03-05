@@ -7,7 +7,7 @@
     
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/Henry/Project/Distiller/scripts/run_scraper.sh</string>
+        <string>/Users/Henry/Project/distiller/scripts/run_scraper.sh</string>
     </array>
     
     <key>StartCalendarInterval</key>
@@ -19,21 +19,21 @@
     </dict>
     
     <key>WorkingDirectory</key>
-    <string>/Users/Henry/Project/Distiller</string>
+    <string>/Users/Henry/Project/distiller</string>
     
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/Users/Henry/Project/Distiller/venv/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>/Users/Henry/Project/distiller/venv/bin:/usr/local/bin:/usr/bin:/bin</string>
         <key>HOME</key>
         <string>/Users/Henry</string>
     </dict>
     
     <key>StandardOutPath</key>
-    <string>/Users/Henry/Project/Distiller/logs/scraper.out</string>
+    <string>/Users/Henry/Project/distiller/logs/scraper.out</string>
     
     <key>StandardErrorPath</key>
-    <string>/Users/Henry/Project/Distiller/logs/scraper.err</string>
+    <string>/Users/Henry/Project/distiller/logs/scraper.err</string>
     
     <key>RunAtLoad</key>
     <false/>

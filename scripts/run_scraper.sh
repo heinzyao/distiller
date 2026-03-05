@@ -4,9 +4,9 @@
 # Runs daily at 3:00 AM using launchd
 # Configuration: com.distiller.scraper.plist
 
-set -e
+set -eo pipefail
 
-PROJECT_DIR="/Users/Henry/Project/Distiller"
+PROJECT_DIR="/Users/Henry/Project/distiller"
 
 # 載入環境變數（LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID 等）
 if [ -f "$PROJECT_DIR/.env" ]; then
