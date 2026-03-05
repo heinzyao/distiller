@@ -19,9 +19,9 @@ venv/
 *.log
 logs/
 
-# Data outputs (keep only versioned/released data)
-distiller_spirits_*.csv
-!distiller_spirits_reviews.csv
+# Data outputs - CSV files centralized in data/
+data/*
+!data/.gitkeep
 
 # SQLite databases
 *.db

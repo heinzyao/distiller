@@ -15,13 +15,14 @@
 ## 專案結構
 
 ```
-Distiller/
+distiller/
 ├── distiller_scraper/         # 核心爬蟲模組
 │   ├── scraper.py             # 主爬蟲類別 DistillerScraperV2
 │   ├── selectors.py           # CSS 選擇器 & SearchURLBuilder
 │   ├── config.py              # 爬蟲配置（含分頁常數）
 │   ├── storage.py             # 儲存後端 (SQLiteStorage, CSVStorage)
 │   └── api_client.py          # API 端點探索客戶端
+├── data/                      # CSV 輸出集中處（自動建立）
 ├── bot.py                     # LINE Bot（Flask webhook，port 8000）
 ├── query.py                   # CLI 查詢工具
 ├── scripts/
@@ -58,13 +59,13 @@ python run.py --mode full
 ### 輸出格式
 
 ```bash
-# CSV 輸出（預設）
+# CSV 輸出（預設），檔案儲存於 data/ 目錄
 python run.py --mode test
 
 # SQLite 輸出
 python run.py --mode medium --output sqlite --db-path spirits.db
 
-# CSV + SQLite 雙輸出
+# CSV + SQLite 雙輸出，CSV 儲存於 data/
 python run.py --mode full --output both
 ```
 
@@ -195,7 +196,7 @@ SQLite schema 包含：
 | 4 | 重複率閾值 | 第 2 頁起重複率 ≥ 80% 時自動停止分頁 |
 | 5 | SQLite upsert | URL 為 `UNIQUE` 欄位，重複寫入時更新而非新增 |
 
-> **注意**：CSV 輸出為每次執行獨立檔案，僅在單次執行內去重。SQLite 為跨執行的唯一去重來源。
+> **注意**：CSV 輸出為每次執行獨立檔案，儲存於 `data/` 目錄，僅在單次執行內去重。SQLite 為跨執行的唯一去重來源。
 
 ## 協作說明
 

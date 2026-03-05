@@ -15,6 +15,10 @@ from pathlib import Path
 # 加入專案路徑
 sys.path.insert(0, str(Path(__file__).parent))
 
+# CSV 輸出目錄
+DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR.mkdir(exist_ok=True)
+
 from distiller_scraper.api_client import DistillerAPIClient
 from distiller_scraper.notify import LineNotifier
 from distiller_scraper.scraper import DistillerScraperV2
@@ -53,7 +57,7 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
     print("測試模式 - 爬取少量資料驗證功能")
     print("=" * 80 + "\n")
 
-    storage, csv_file = _build_storage(output, db_path, "distiller_test_v2.csv")
+    storage, csv_file = _build_storage(output, db_path, str(DATA_DIR / "distiller_test_v2.csv"))
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
     scraper.scrape(
@@ -81,7 +85,7 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     storage, csv_file = _build_storage(
-        output, db_path, f"distiller_spirits_{timestamp}.csv"
+        output, db_path, str(DATA_DIR / f"distiller_spirits_{timestamp}.csv")
     )
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
@@ -110,7 +114,7 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     storage, csv_file = _build_storage(
-        output, db_path, f"distiller_spirits_full_{timestamp}.csv"
+        output, db_path, str(DATA_DIR / f"distiller_spirits_full_{timestamp}.csv")
     )
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
