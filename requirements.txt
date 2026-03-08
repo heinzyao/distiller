@@ -4,7 +4,6 @@ beautifulsoup4
 pandas
 lxml
 selenium>=4.20.0,<4.30.0  # 4.40+ has import timeout issues on macOS
-webdriver-manager
 
 # Testing
 pytest>=8.0.0

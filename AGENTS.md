@@ -19,6 +19,39 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-03-08 | OpenCode Sisyphus
+
+**工作內容**：
+1. **排程失敗根因分析（3/7 & 3/8）**
+   - 3/7：DB 已有全部資料，7 個類別全數 dedup → `spirits_data` 為空 → `run.py` 誤判為失敗（假警報）
+   - 3/8：Chrome 自動更新至 `145.0.7632.160`，但 chromedriver 最新僅 `.117` → 版本不匹配 → 所有頁面 timeout
+
+2. **Fix 1：修正 `run.py` 成功判斷邏輯**
+   - 原邏輯 `len(spirits_data) > 0` 在 clean dedup 場景下誤判失敗
+   - 新邏輯：`scrape_ok and (有資料 or 無錯誤)`，允許「0 筆新資料但無異常」= 成功
+   - 新增 `has_errors` 檢查（`failed_urls` + `page_errors`）
+   - 三個 run function（`run_test`、`run_medium`、`run_full`）統一修正
+
+3. **Fix 2：新增 `page_errors` 頁面錯誤計數器**
+   - `DistillerScraperV2.__init__` 新增 `self.page_errors: int = 0`
+   - 三處 catch point 累加：分頁載入失敗、滾動 fallback 失敗、category 級錯誤
+   - `get_statistics()` 與完成日誌均納入 `page_errors` 輸出
+
+4. **Fix 3：移除 `webdriver-manager`，改用 Selenium Manager**
+   - Selenium 4.6+ 內建 Selenium Manager 自動解析 Chrome + chromedriver 版本相容性
+   - 移除 `ChromeDriverManager().install()` 與 `ChromeService`
+   - `start_driver()` 簡化為 `webdriver.Chrome(options=options)`
+   - 從 `pyproject.toml` 和 `requirements.txt` 移除 `webdriver-manager` 依賴
+
+**主要變更**：
+- 修改 `run.py`（成功判斷邏輯修正，3 處）
+- 修改 `distiller_scraper/scraper.py`（`page_errors` 計數器 + Selenium Manager 遷移）
+- 修改 `pyproject.toml`（移除 `webdriver-manager`）
+- 修改 `requirements.txt`（移除 `webdriver-manager`）
+- **總計：294 個測試全數通過**
+
+---
+
 ### 2026-03-02 | OpenCode Atlas Orchestrator (Session 2)
 
 **工作內容**：
@@ -425,7 +458,8 @@ python run.py --mode full
 - [x] LINE Bot（webhook 查詢）與 CLI 查詢工具 ✅ 2026-02-28
 - [x] 通知可靠性修復（重試、回傳值檢查）✅ 2026-03-01
 - [x] 爬蟲容錯修復（分頁 fallback 崩潰、per-category 錯誤隔離）✅ 2026-03-02
+- [x] 排程失敗根因修復（false failure + Chrome 版本不匹配 + page_errors 計數）✅ 2026-03-08
 
 ---
 
-*最後更新：2026-03-02 by OpenCode Sisyphus*
+*最後更新：2026-03-08 by OpenCode Sisyphus*

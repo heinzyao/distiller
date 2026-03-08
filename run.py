@@ -60,7 +60,7 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
     storage, csv_file = _build_storage(output, db_path, str(DATA_DIR / "distiller_test_v2.csv"))
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
-    scraper.scrape(
+    scrape_ok = scraper.scrape(
         categories=["whiskey"],
         max_per_category=5,
         use_styles=False,
@@ -74,7 +74,10 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    return len(scraper.spirits_data) > 0, stats
+    # Success = scrape completed AND (found data OR cleanly deduped with no errors)
+    has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
+    success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
+    return success, stats
 
 
 def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
@@ -89,7 +92,7 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
     )
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
-    scraper.scrape(
+    scrape_ok = scraper.scrape(
         categories=["whiskey", "gin", "rum", "vodka"],
         max_per_category=50,
         use_styles=True,
@@ -103,7 +106,10 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    return len(scraper.spirits_data) > 0, stats
+    # Success = scrape completed AND (found data OR cleanly deduped with no errors)
+    has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
+    success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
+    return success, stats
 
 
 def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
@@ -118,7 +124,7 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
     )
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
-    scraper.scrape(
+    scrape_ok = scraper.scrape(
         categories=[
             "whiskey",
             "gin",
@@ -140,7 +146,10 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    return len(scraper.spirits_data) > 0, stats
+    # Success = scrape completed AND (found data OR cleanly deduped with no errors)
+    has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
+    success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
+    return success, stats
 
 
 def main():

@@ -2,6 +2,22 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.5.0] - 2026-03-08
+
+### 修復
+- **排程假警報修正**：`run.py` 成功判斷從 `len(spirits_data) > 0` 改為 `scrape_ok and (有資料 or 無錯誤)`，避免 DB 已滿時 clean dedup 被誤判為失敗（3/7 排程失敗根因）
+- **Chrome/chromedriver 版本不匹配**：移除 `webdriver-manager`，改用 Selenium 內建 Selenium Manager 自動解析相容的 Chrome + chromedriver（3/8 全部 timeout 根因）
+
+### 新增
+- **`page_errors` 計數器**：`DistillerScraperV2` 新增頁面載入失敗計數，三處 catch point（分頁載入、滾動 fallback、category 級錯誤）累加
+- `get_statistics()` 和完成日誌均納入 `page_errors` 輸出
+
+### 變更
+- 移除 `webdriver-manager` 依賴（`pyproject.toml` 和 `requirements.txt`）
+- `start_driver()` 簡化為 `webdriver.Chrome(options=options)`，不再需要 `ChromeService` 和 `ChromeDriverManager`
+- 三個 run function（`run_test`、`run_medium`、`run_full`）統一採用新成功判斷邏輯
+- **總計：294 個測試全數通過**
+
 ## [2.4.2] - 2026-03-02
 
 ### 改善

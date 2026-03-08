@@ -55,6 +55,7 @@ class DistillerScraperV2:
         self.driver: Optional[Any] = None  # webdriver.Chrome, 延遲導入
         self.spirits_data: List[Dict] = []
         self.failed_urls: List[str] = []
+        self.page_errors: int = 0  # 頁面載入失敗計數（如 timeout）
         # 去重：若有 storage 則從 DB 載入已存 URLs
         self.seen_urls: Set[str] = (
             storage.get_existing_urls() if storage else set()
@@ -66,8 +67,6 @@ class DistillerScraperV2:
             # 延遲導入 selenium 相關模組以加速模組載入
             from selenium import webdriver
             from selenium.webdriver.chrome.options import Options as ChromeOptions
-            from selenium.webdriver.chrome.service import Service as ChromeService
-            from webdriver_manager.chrome import ChromeDriverManager
 
             logger.info("正在啟動 Chrome WebDriver...")
             options = ChromeOptions()
@@ -84,8 +83,8 @@ class DistillerScraperV2:
             # 啟用 Performance Logging 以捕獲 XHR 請求（用於 API 探測）
             options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
-            service = ChromeService(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=options)
+            # Selenium Manager 自動解析相容的 Chrome + chromedriver（Selenium 4.6+）
+            self.driver = webdriver.Chrome(options=options)
             self.driver.set_page_load_timeout(ScraperConfig.PAGE_LOAD_TIMEOUT)
 
             logger.info("✓ Chrome WebDriver 已啟動")
@@ -346,6 +345,7 @@ class DistillerScraperV2:
                     urls_on_page = self._fetch_spirit_urls(base_url, page)
                 except Exception as e:
                     logger.error(f"  載入第 {page} 頁失敗: {e}")
+                    self.page_errors += 1
                     break
 
                 if not urls_on_page:
@@ -382,6 +382,7 @@ class DistillerScraperV2:
                             self._scrape_urls(first_page_urls, category, results, max_spirits)
                         except Exception as e:
                             logger.warning(f"  滾動模式 fallback 失敗: {e}")
+                            self.page_errors += 1
                     else:
                         logger.info(f"  第 {page} 頁無新 URL，分頁結束")
                     break
@@ -511,6 +512,7 @@ class DistillerScraperV2:
                         time.sleep(2)
                         continue
                 logger.error(f"爬取 {label} 時發生錯誤: {e}")
+                self.page_errors += 1
                 continue
 
             if len(queries) > 1:
@@ -578,6 +580,7 @@ class DistillerScraperV2:
             logger.info(f"爬取完成！")
             logger.info(f"總筆數: {len(self.spirits_data)}")
             logger.info(f"失敗 URL 數: {len(self.failed_urls)}")
+            logger.info(f"頁面載入失敗數: {self.page_errors}")
             logger.info(f"耗時: {duration / 60:.1f} 分鐘")
             logger.info(f"{'=' * 80}\n")
             
@@ -625,7 +628,7 @@ class DistillerScraperV2:
     def get_statistics(self) -> Dict:
         """獲取統計資訊"""
         if not self.spirits_data:
-            return {"總記錄數": 0}
+            return {"總記錄數": 0, "失敗 URL 數": len(self.failed_urls), "頁面載入失敗數": self.page_errors}
 
         df = self.to_dataframe()
 
@@ -644,6 +647,7 @@ class DistillerScraperV2:
         return {
             "總記錄數": len(df),
             "失敗 URL 數": len(self.failed_urls),
+            "頁面載入失敗數": self.page_errors,
             "類別分布": df["category"].value_counts().to_dict()
             if "category" in df.columns
             else {},
