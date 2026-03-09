@@ -333,7 +333,8 @@ class DistillerScraperV2:
 
             logger.info(f"[分頁] 開始爬取: {label}")
             pagination_works = False  # 確認分頁是否真的有效
-            db_urls = self.storage.get_existing_urls() if self.storage else set()
+            prev_page_urls: set = set()
+            consecutive_dup_pages = 0
 
             for page in range(1, ScraperConfig.MAX_PAGES_PER_QUERY + 1):
                 if len(results) >= max_spirits:
@@ -356,43 +357,55 @@ class DistillerScraperV2:
                 new_urls = [u for u in urls_on_page if u not in self.seen_urls]
                 total_on_page = len(urls_on_page)
                 duplicate_ratio = 1.0 - (len(new_urls) / total_on_page)
+                current_page_set = set(urls_on_page)
 
                 logger.info(
                     f"  第 {page} 頁找到 {total_on_page} 個連結，"
                     f"新增 {len(new_urls)} 個（重複率 {duplicate_ratio:.0%}）"
                 )
 
-                # 判斷分頁是否有效（第二頁起出現新內容 = 分頁有效）
-                if page == 2 and len(new_urls) >= ScraperConfig.MIN_NEW_URLS_PER_PAGE:
-                    pagination_works = True
-                    logger.info("  分頁機制有效，繼續翻頁")
-
-                # 第二頁起若無新 URL，判斷已到結尾
-                if page >= 2 and len(new_urls) < ScraperConfig.MIN_NEW_URLS_PER_PAGE:
-                    if not pagination_works:
-                        # NEW: Check if category is already fully in DB
-                        if urls_on_page and self.storage and all(u in db_urls for u in urls_on_page):
-                            logger.info("  此類別資料已存在於資料庫，跳過")
-                            break
-                        
-                        logger.info("  分頁無效（第二頁無新內容），切換至滾動模式")
-                        # fallback: 重新以 Selenium 滾動模式爬第一頁
-                        try:
-                            first_page_urls = self._fetch_spirit_urls_from_page(base_url)
-                            self._scrape_urls(first_page_urls, category, results, max_spirits)
-                        except Exception as e:
-                            logger.warning(f"  滾動模式 fallback 失敗: {e}")
-                            self.page_errors += 1
+                # ── 分頁有效性判斷（僅在第 2 頁） ──
+                if page == 2:
+                    if current_page_set != prev_page_urls:
+                        pagination_works = True
+                        logger.info("  分頁機制有效，繼續翻頁")
                     else:
-                        logger.info(f"  第 {page} 頁無新 URL，分頁結束")
-                    break
+                        # 分頁無效：第 2 頁與第 1 頁完全相同
+                        if all(u in self.seen_urls for u in urls_on_page):
+                            logger.info("  此類別資料已存在於資料庫，跳過")
+                        else:
+                            logger.info("  分頁無效（第二頁無新內容），切換至滾動模式")
+                            try:
+                                first_page_urls = self._fetch_spirit_urls_from_page(base_url)
+                                self._scrape_urls(first_page_urls, category, results, max_spirits)
+                            except Exception as e:
+                                logger.warning(f"  滾動模式 fallback 失敗: {e}")
+                                self.page_errors += 1
+                        break
 
-                # 重複率過高也停止
-                if page >= 2 and duplicate_ratio >= ScraperConfig.DUPLICATE_RATIO_THRESHOLD:
+                prev_page_urls = current_page_set
+
+                # ── 有新 URL → 爬取並重置計數器 ──
+                if new_urls:
+                    consecutive_dup_pages = 0
+                    self._scrape_urls(urls_on_page, category, results, max_spirits)
+                elif pagination_works:
+                    # ── 無新 URL 但分頁有效 → 累計連續重複頁 ──
+                    consecutive_dup_pages += 1
+                    logger.info(
+                        f"  連續 {consecutive_dup_pages}/{ScraperConfig.MAX_CONSECUTIVE_DUP_PAGES} 頁無新 URL"
+                    )
+                    if consecutive_dup_pages >= ScraperConfig.MAX_CONSECUTIVE_DUP_PAGES:
+                        logger.info("  此風格已完整收錄，停止分頁")
+                        break
+                else:
+                    # page == 1 且無新 URL（首頁全部已知），繼續翻到第 2 頁判斷分頁有效性
+                    self._scrape_urls(urls_on_page, category, results, max_spirits)
+
+                # 重複率過高也停止（僅在有部分新 URL 時判斷）
+                if page >= 2 and new_urls and duplicate_ratio >= ScraperConfig.DUPLICATE_RATIO_THRESHOLD:
                     logger.info(f"  重複率 {duplicate_ratio:.0%} 過高，停止分頁")
                     break
-
-                self._scrape_urls(urls_on_page, category, results, max_spirits)
 
                 # 每頁間延遲
                 if len(results) < max_spirits:

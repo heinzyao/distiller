@@ -221,17 +221,17 @@ class TestScrapeCategoryPaginated:
 
         assert len(results) <= 4
 
-    def test_high_duplicate_ratio_stops_pagination(self, scraper, mock_driver):
-        """第二頁大量重複 URL 時應停止分頁"""
+    def test_broken_pagination_with_known_urls_skips(self, scraper, mock_driver):
+        """第二頁與第一頁完全相同且全在 seen_urls → 分頁無效，跳過"""
         base  = "https://distiller.com/search?category=whiskey&sort=distiller_score"
         page2 = base + "&page=2"
         pages = {
             base:  ["spirit-1", "spirit-2", "spirit-3", "spirit-4"],
-            # 4 個 URL 全與第一頁相同 → 重複率 100%
+            # 4 個 URL 全與第一頁相同 → 分頁無效
             page2: ["spirit-1", "spirit-2", "spirit-3", "spirit-4"],
         }
         self._setup_pages(scraper, mock_driver, pages)
-        # 預先加入 seen_urls 模擬第一頁已爬完
+        # 預先加入 seen_urls 模擬已爬完
         scraper.seen_urls = {
             f"https://distiller.com/spirits/spirit-{i}" for i in range(1, 5)
         }
@@ -242,8 +242,114 @@ class TestScrapeCategoryPaginated:
                 "whiskey", max_spirits=50, use_styles=False
             )
 
-        # 第二頁全重複，分頁應終止
-        assert mock_detail.call_count == 0  # scrape_spirit_detail 不被呼叫（已在 seen_urls）
+        # 分頁無效 + 全在 seen_urls → 跳過，不爬任何詳情
+        assert mock_detail.call_count == 0
+
+    def test_continues_past_duplicate_pages(self, scraper, mock_driver, mocker):
+        """頁 1-2 全在 seen_urls 但 URL 不同 → 分頁有效 → 繼續到第 3 頁找到新 URL"""
+        mocker.patch("time.sleep")
+        base  = "https://distiller.com/search?category=whiskey&sort=distiller_score"
+        page2 = base + "&page=2"
+        page3 = base + "&page=3"
+        page4 = base + "&page=4"
+        pages = {
+            base:  ["spirit-1", "spirit-2"],   # 已知
+            page2: ["spirit-3", "spirit-4"],   # 已知但不同 → pagination_works=True
+            page3: ["spirit-5", "spirit-6"],   # 新 URL！
+            page4: [],
+        }
+        self._setup_pages(scraper, mock_driver, pages)
+        # 頁 1-2 的 URL 已在 seen_urls
+        scraper.seen_urls = {
+            f"https://distiller.com/spirits/spirit-{i}" for i in range(1, 5)
+        }
+
+        with patch.object(scraper, "scrape_spirit_detail") as mock_detail:
+            mock_detail.side_effect = lambda url, **kw: {
+                "name": url.split("/")[-1],
+                "url": url,
+                "spirit_type": "N/A",
+                "brand": "N/A",
+                "country": "N/A",
+            }
+            results = scraper.scrape_category_paginated(
+                "whiskey", max_spirits=50, use_styles=False
+            )
+
+        # 應該到第 3 頁並爬取 spirit-5, spirit-6
+        assert len(results) >= 2
+        result_urls = [r["url"] for r in results]
+        assert "https://distiller.com/spirits/spirit-5" in result_urls
+        assert "https://distiller.com/spirits/spirit-6" in result_urls
+
+    def test_stops_after_consecutive_dup_pages(self, scraper, mock_driver, mocker):
+        """連續 MAX_CONSECUTIVE_DUP_PAGES 頁全為已知 URL → 停止"""
+        mocker.patch("time.sleep")
+        base  = "https://distiller.com/search?category=whiskey&sort=distiller_score"
+        # 建立 6 頁：頁 1-2 不同(確認分頁有效)，頁 3-5 全已知 → 觸發停止
+        pages = {}
+        pages[base] = ["spirit-1", "spirit-2"]
+        for p in range(2, 7):
+            url = base + f"&page={p}"
+            pages[url] = [f"spirit-{p*2-1}", f"spirit-{p*2}"]
+        self._setup_pages(scraper, mock_driver, pages)
+
+        # 全部 URL 都已在 seen_urls
+        scraper.seen_urls = {
+            f"https://distiller.com/spirits/spirit-{i}" for i in range(1, 13)
+        }
+
+        with patch.object(scraper, "scrape_spirit_detail") as mock_detail:
+            mock_detail.return_value = None
+            results = scraper.scrape_category_paginated(
+                "whiskey", max_spirits=50, use_styles=False
+            )
+
+        # 分頁有效但連續 3 頁（頁 2-4）無新 URL → 停止
+        # 不應爬到第 6 頁
+        assert mock_detail.call_count == 0
+
+    def test_resets_consecutive_dup_on_new_urls(self, scraper, mock_driver, mocker):
+        """
+        頁 1-2 已知 → consecutive=1
+        頁 3 有新 URL → consecutive 重置為 0
+        頁 4-6 已知 → consecutive 累積到 3 → 停止
+        """
+        mocker.patch("time.sleep")
+        base  = "https://distiller.com/search?category=whiskey&sort=distiller_score"
+        pages = {}
+        pages[base] = ["spirit-1", "spirit-2"]
+        pages[base + "&page=2"] = ["spirit-3", "spirit-4"]      # 已知, pagination_works=True, consec=1
+        pages[base + "&page=3"] = ["spirit-new-1", "spirit-new-2"]  # 新！ consec=0
+        pages[base + "&page=4"] = ["spirit-5", "spirit-6"]      # 已知, consec=1
+        pages[base + "&page=5"] = ["spirit-7", "spirit-8"]      # 已知, consec=2
+        pages[base + "&page=6"] = ["spirit-9", "spirit-10"]     # 已知, consec=3 → 停止
+        pages[base + "&page=7"] = ["spirit-11", "spirit-12"]    # 不應到達
+        self._setup_pages(scraper, mock_driver, pages)
+
+        # 除了 spirit-new-1, spirit-new-2 之外全已知
+        scraper.seen_urls = {
+            f"https://distiller.com/spirits/spirit-{i}" for i in range(1, 13)
+        }
+
+        with patch.object(scraper, "scrape_spirit_detail") as mock_detail:
+            mock_detail.side_effect = lambda url, **kw: {
+                "name": url.split("/")[-1],
+                "url": url,
+                "spirit_type": "N/A",
+                "brand": "N/A",
+                "country": "N/A",
+            }
+            results = scraper.scrape_category_paginated(
+                "whiskey", max_spirits=50, use_styles=False
+            )
+
+        # 頁 3 的新 URL 應被爬取
+        result_names = [r["name"] for r in results]
+        assert "spirit-new-1" in result_names or "spirit-new-2" in result_names
+        # 頁 7 不應被到達（consecutive_dup 在頁 6 達到 3）
+        called_urls = [call.args[0] for call in mock_detail.call_args_list]
+        assert "https://distiller.com/spirits/spirit-11" not in called_urls
 
     def test_skips_seen_urls(self, scraper, mock_driver):
         """已在 seen_urls 的 URL 不重複爬取"""

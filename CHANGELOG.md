@@ -2,6 +2,23 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.5.1] - 2026-03-09
+
+### 修復
+- **分頁 early-stop 邏輯修正**：`scrape_category_paginated` 將「分頁無效」（page 2 回傳與 page 1 相同的 URL）與「URL 已在 DB」（page 2 URL 不同但都在 `seen_urls`）分離判斷
+  - 根因：DB 已有 2,796 筆資料時，page 1-2 全在 DB → 誤判分頁無效 → 無法發現 page 3+ 的新酒款
+  - 新增 `consecutive_dup_pages` 計數器，連續 N 頁無新 URL 才停止（而非第 1 頁就停）
+  - Page 1 無新 URL 時不再提前 break，繼續到 page 2 驗證分頁有效性
+
+### 新增
+- **`MAX_CONSECUTIVE_DUP_PAGES = 3`** 常數（`config.py`），控制連續無新 URL 頁面的容忍上限
+- **4 個分頁測試**（`test_pagination.py`）：跨頁續爬、連續 dup 停止、計數器重置、已知 URL 跳過
+- **總計：297 個測試全數通過**
+
+### 變更
+- 重寫 `scrape_category_paginated` 分頁迴圈（lines 335-412）
+- 重新命名 `test_high_duplicate_ratio_stops_pagination` → `test_broken_pagination_with_known_urls_skips`
+
 ## [2.5.0] - 2026-03-08
 
 ### 修復

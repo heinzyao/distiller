@@ -31,6 +31,7 @@ class ScraperConfig:
     # 停止分頁的判斷條件
     MIN_NEW_URLS_PER_PAGE = 2       # 每頁至少需取得此數量的新 URL
     DUPLICATE_RATIO_THRESHOLD = 0.8 # 重複 URL 比例超過此值時停止
+    MAX_CONSECUTIVE_DUP_PAGES = 3   # 連續 N 頁全為已知 URL 時停止分頁
 
     # 類別列表
     CATEGORIES = [

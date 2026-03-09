@@ -19,6 +19,33 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-03-09 | OpenCode Sisyphus
+
+**工作內容**：
+1. **分頁 early-stop 邏輯修正**
+   - 根因：`scrape_category_paginated` 將「分頁無效」（page 2 回傳與 page 1 相同的 URL）與「URL 已在 DB 中」（page 2 URL 不同但都在 `seen_urls`）混為一談
+   - DB 已有 2,796 筆資料時，page 1-2 URL 全在 DB → 誤判分頁無效 → 無法發現 page 3+ 的新酒款
+   - **Fix**：重寫 `scrape_category_paginated` 分頁迴圈（lines 335-412）
+     - 分離「分頁是否有效」（page 2 URL set ≠ page 1 URL set）與「是否有新 URL」兩個判斷
+     - 新增 `consecutive_dup_pages` 計數器：連續 N 頁無新 URL 才停止（而非第 1 頁就停）
+     - `config.py` 新增 `MAX_CONSECUTIVE_DUP_PAGES = 3` 常數
+     - Page 1 無新 URL 時不再提前 break，繼續到 page 2 驗證分頁有效性
+
+2. **測試更新**
+   - 重新命名 `test_high_duplicate_ratio_stops_pagination` → `test_broken_pagination_with_known_urls_skips`（反映新邏輯路徑）
+   - 新增 `test_continues_past_duplicate_pages`：驗證跨過已知頁面後能爬取新頁面
+   - 新增 `test_stops_after_consecutive_dup_pages`：驗證連續 N 頁無新 URL 後停止
+   - 新增 `test_resets_consecutive_dup_on_new_urls`：驗證中間出現新 URL 重置計數器
+   - 所有 3 個新測試加入 `time.sleep` mock 避免延遲
+
+**主要變更**：
+- 修改 `distiller_scraper/config.py`（新增 `MAX_CONSECUTIVE_DUP_PAGES = 3`）
+- 修改 `distiller_scraper/scraper.py`（重寫 `scrape_category_paginated` 分頁迴圈）
+- 修改 `tests/integration/test_pagination.py`（更新 1 個測試 + 新增 3 個測試，共 21 個）
+- **總計：297 個測試全數通過**
+
+---
+
 ### 2026-03-08 | OpenCode Sisyphus
 
 **工作內容**：
@@ -459,7 +486,8 @@ python run.py --mode full
 - [x] 通知可靠性修復（重試、回傳值檢查）✅ 2026-03-01
 - [x] 爬蟲容錯修復（分頁 fallback 崩潰、per-category 錯誤隔離）✅ 2026-03-02
 - [x] 排程失敗根因修復（false failure + Chrome 版本不匹配 + page_errors 計數）✅ 2026-03-08
+- [x] 分頁 early-stop 邏輯修正（consecutive dup pages + 分離分頁有效性判斷）✅ 2026-03-09
 
 ---
 
-*最後更新：2026-03-08 by OpenCode Sisyphus*
+*最後更新：2026-03-09 by OpenCode Sisyphus*
