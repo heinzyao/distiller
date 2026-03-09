@@ -52,12 +52,17 @@ logger = logging.getLogger(__name__)
 LINE_TOKEN_URL = "https://api.line.me/v2/oauth/accessToken"
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 DB_DEFAULT = "distiller.db"
-MSG_LIMIT = 4900  # LINE 單則訊息字元上限
+MSG_LIMIT = 4900  # LINE 單則訊息字元上限（官方上限 5000，保留 100 字元緩衝）
 
-_SEP = "━" * 16
-_SEP_LIGHT = "─" * 16
-_MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
+# 視覺元素：統一的分隔線與獎牌圖示，讓 LINE 訊息格式一致且易讀
+_SEP = "━" * 16        # 主要分隔線（粗）
+_SEP_LIGHT = "─" * 16  # 次要分隔線（細）
+_MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}  # Top 3 排行獎牌
 
+# Access Token 快取：避免每次 Webhook 請求都重新取得 Token
+# 結構：{"token": str, "expires_at": float（UNIX timestamp）}
+# 設計理由：LINE Channel Access Token 有效期 30 天，但短期 token 有效期約 30 天
+# 此處使用 23 小時 TTL（82800 秒），在到期前 60 秒自動更新（_get_cached_token 邏輯）
 _token_cache: dict[str, str | float] = {}
 
 

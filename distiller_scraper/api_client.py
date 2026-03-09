@@ -1,12 +1,33 @@
 """
-Distiller.com 直接 HTTP API 客戶端
+Distiller.com 直接 HTTP API 客戶端：嘗試繞過 Selenium 渲染，直接呼叫後端 JSON API。
 
-嘗試繞過 Selenium 渲染，直接呼叫後端 JSON API。
-若 API 不可用，所有方法回傳 None / []，呼叫端應 fallback 至 Selenium。
+設計理由——為何需要 API 探測？
+Selenium 爬取每頁需要 5-10 秒（瀏覽器啟動 + 頁面渲染 + JavaScript 執行）。
+若 Distiller.com 有開放的 JSON API 端點，直接 HTTP 請求只需 0.5-1 秒，
+速度提升約 10 倍，且更穩定（不受 Chrome 崩潰影響）。
 
-探測策略：
-  1. 分析 Selenium 捕獲的 XHR URL（Phase 2 已實作 capture_xhr_requests）
-  2. 嘗試已知的候選路徑（Rails .json 慣例、常見 /api/ 路徑）
+探測策略（兩階段）
+------------------
+1. XHR 分析（動態探測）：
+   利用 scraper.capture_xhr_requests() 捕獲瀏覽器載入頁面時發送的 XHR 請求，
+   過濾出可能是 JSON API 的 URL（排除靜態資源），逐一測試可用性
+
+2. 候選路徑測試（靜態探測）：
+   嘗試常見的 Rails .json 慣例（/search.json, /spirits/{slug}.json）
+   和 REST API 路徑（/api/v1/spirits/search），適用於 XHR 分析未找到端點的情況
+
+回傳值約定
+----------
+- fetch_search_results()：[] 表示「本頁無結果」（合法），None 表示「請求失敗」
+  → 呼叫端可區分「已到資料末尾」與「需要 fallback 至 Selenium」
+
+- fetch_spirit_detail()：None 表示 API 不可用或解析失敗
+  → 呼叫端 fallback 至 Selenium 爬取詳情頁
+
+_map_search_response / _map_detail_response 的設計
+---------------------------------------------------
+API 回應格式不固定（list、{spirits:[...]}, {data:{...}} 等）
+用防禦性解析策略，逐一嘗試已知格式，確保回應格式變更時不會直接崩潰
 """
 
 import logging

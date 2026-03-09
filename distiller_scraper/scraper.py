@@ -1,12 +1,45 @@
 #!/usr/bin/env python3
 """
-Distiller.com 爬蟲 V2
-改進版本 - 基於 2026-01-27 驗證的 CSS 選擇器
-支援：
-- 正確的 CSS 選擇器提取完整資料
-- 去重處理
-- 分頁與風格篩選擴大爬取範圍
-- 詳細的風味圖譜提取
+Distiller.com 爬蟲 V2：烈酒評分資料爬取器。
+
+架構設計
+--------
+本爬蟲採用「API 優先 + Selenium fallback」的雙模式架構：
+
+┌─────────────────────────────────────────┐
+│  DistillerScraperV2                     │
+│                                         │
+│  discover_api()  ← XHR 捕獲 + 候選探測  │
+│       ↓                                 │
+│  scrape_category_paginated()            │
+│       ├─ _fetch_spirit_urls()           │
+│       │    ├─ [API mode]  api_client    │  ← 快速、穩定
+│       │    └─ [Selenium]  WebDriver    │  ← 較慢，作為 fallback
+│       └─ scrape_spirit_detail()        │
+│            ├─ [API mode]  api_client   │
+│            └─ [Selenium]  BeautifulSoup│
+└─────────────────────────────────────────┘
+
+爬取策略
+--------
+1. 分頁模式（預設）：對每個類別的 search URL 翻頁爬取
+   優點：可取得遠超頁面顯示上限的資料，且效率高
+   停止條件：連續 N 頁重複 / 重複率過高 / 達到頁數上限
+
+2. 滾動模式（fallback）：讓 Selenium 滾動頁面觸發 lazy-loading
+   適用於：分頁機制無效時（第 2 頁與第 1 頁內容相同）
+
+去重機制
+--------
+seen_urls：在記憶體中維護已爬取的 URL 集合，初始化時從 SQLite 載入
+優點：爬取過程中的即時去重，避免重複請求相同頁面
+設計選擇：Set[str] 而非 DB 查詢，因記憶體查詢 O(1) 遠快於磁碟 IO
+
+Session 恢復機制
+----------------
+Selenium WebDriver 偶爾因 Chrome 崩潰或記憶體不足出現 session 斷開，
+scrape_spirit_detail() 偵測到 "invalid session id" / "session deleted" 錯誤時
+自動呼叫 restart_driver() 重新啟動瀏覽器並重試（最多 MAX_RETRIES 次）
 """
 
 import json
@@ -37,7 +70,18 @@ logger = logging.getLogger(__name__)
 
 
 class DistillerScraperV2:
-    """改進版 Distiller.com 爬蟲"""
+    """改進版 Distiller.com 爬蟲。
+
+    初始化參數設計：
+    - headless：生產環境設 True（無頭），除錯時設 False 可觀察瀏覽器行為
+    - delay_min/delay_max：隨機延遲範圍，過短容易被封鎖，過長則效率低落
+    - storage：注入儲存後端（SQLite 或 CSV），None 表示僅在記憶體暫存
+    - api_client：注入 HTTP API 客戶端，None 則完全使用 Selenium 模式
+
+    依賴注入（Dependency Injection）的設計理由：
+    - storage 和 api_client 以外部注入而非在內部建立，方便測試時 mock
+    - 允許不同場景使用不同儲存後端（測試用 CSV，生產用 SQLite）
+    """
 
     def __init__(
         self,
@@ -52,19 +96,31 @@ class DistillerScraperV2:
         self.delay_max = delay_max
         self.storage = storage
         self.api_client = api_client
-        self.driver: Optional[Any] = None  # webdriver.Chrome, 延遲導入
-        self.spirits_data: List[Dict] = []
-        self.failed_urls: List[str] = []
-        self.page_errors: int = 0  # 頁面載入失敗計數（如 timeout）
-        # 去重：若有 storage 則從 DB 載入已存 URLs
+        self.driver: Optional[Any] = None  # webdriver.Chrome，延遲導入以加速初始化
+        self.spirits_data: List[Dict] = []  # 本次執行爬取的所有結果（記憶體暫存）
+        self.failed_urls: List[str] = []    # 爬取失敗的 URL 列表（用於事後重試或除錯）
+        self.page_errors: int = 0           # 頁面載入失敗計數（timeout 等非 URL 問題）
+        # 去重集合：有 storage 時從 DB 載入已知 URLs，避免重複爬取
+        # 設計理由：記憶體 Set 查詢 O(1)，遠比每次爬取前都 DB 查詢更有效率
         self.seen_urls: Set[str] = (
             storage.get_existing_urls() if storage else set()
         )
 
     def start_driver(self) -> bool:
-        """啟動 Chrome WebDriver"""
+        """啟動 Chrome WebDriver。
+
+        各 Chrome 參數的設計理由：
+        - --headless=new：新版無頭模式（Chrome 112+），比舊版 --headless 更穩定
+        - --no-sandbox：在 Docker/CI 環境中必須關閉（沙盒需要特殊 kernel 設定）
+        - --disable-dev-shm-usage：避免在 /dev/shm 空間不足時崩潰（Docker 預設 64MB）
+        - --disable-gpu：無頭環境通常無 GPU，關閉可避免相關錯誤
+        - Performance Logging：捕獲所有網路請求，供 discover_api() 分析 XHR 端點
+
+        Selenium Manager（Selenium 4.6+）：
+        自動下載與 Chrome 版本相容的 chromedriver，無需手動管理 chromedriver 版本
+        """
         try:
-            # 延遲導入 selenium 相關模組以加速模組載入
+            # 延遲導入 selenium 相關模組：避免在測試環境中（未安裝 selenium）報錯
             from selenium import webdriver
             from selenium.webdriver.chrome.options import Options as ChromeOptions
 
@@ -72,15 +128,15 @@ class DistillerScraperV2:
             options = ChromeOptions()
 
             if self.headless:
-                options.add_argument("--headless=new")
+                options.add_argument("--headless=new")  # 新版無頭模式，更接近真實瀏覽器行為
 
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")           # Docker 環境必需
+            options.add_argument("--disable-dev-shm-usage")  # 避免共享記憶體不足崩潰
+            options.add_argument("--disable-gpu")           # 無頭環境無 GPU
             options.add_argument(f"--window-size={ScraperConfig.WINDOW_SIZE}")
             options.add_argument(f"user-agent={ScraperConfig.USER_AGENT}")
 
-            # 啟用 Performance Logging 以捕獲 XHR 請求（用於 API 探測）
+            # 啟用 Performance Logging：捕獲所有 Network 事件，用於 XHR API 探測
             options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
             # Selenium Manager 自動解析相容的 Chrome + chromedriver（Selenium 4.6+）

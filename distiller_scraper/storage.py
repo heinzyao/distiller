@@ -1,6 +1,36 @@
 """
-資料儲存層 - 支援 CSV 和 SQLite
-使用 Repository Pattern 抽象儲存細節
+資料儲存層：抽象化 SQLite 與 CSV 兩種儲存後端。
+
+架構設計（Repository Pattern）
+--------------------------------
+使用抽象基礎類別 StorageBackend 定義統一介面，
+SQLiteStorage 和 CSVStorage 分別實作：
+
+  StorageBackend（ABC）
+       ├─ SQLiteStorage  ← 生產環境：支援查詢、去重、提醒、批次更新
+       └─ CSVStorage     ← 相容性：向後相容，輕量輸出，適合簡單場景
+
+設計理由：
+- DistillerScraperV2 透過 storage 注入後端，不直接依賴 SQLite 或 pandas
+  → 爬蟲邏輯與儲存細節解耦，方便測試和替換後端
+- SQLiteStorage 在每次 save_spirit 後立即 commit（即時持久化）
+  → 爬蟲中途中斷時，已爬取的資料不會遺失
+- CSVStorage 在記憶體中累積，呼叫 flush() 才寫入磁碟
+  → 適合批次處理，不適合長時間爬取
+
+SQLite Schema 設計要點
+-----------------------
+- spirits.url 設 UNIQUE：防止重複爬取同一烈酒頁面（url 是天然主鍵）
+- flavor_profiles：獨立資料表 + FOREIGN KEY，支援依風味維度查詢
+  （如：找出 smoky 分數最高的 10 款威士忌）
+- scrape_runs：紀錄每次爬取的元資料，用於稽核與效能分析
+- WAL (Write-Ahead Logging)：允許讀寫同時進行，提升並發效能
+- PRAGMA foreign_keys = ON：強制執行 FK 約束（SQLite 預設關閉）
+
+欄位轉型輔助函式
+----------------
+_to_real / _to_int / _to_text：統一處理 "N/A" / "" / None 轉換，
+避免在各處重複寫 try/except 的轉型邏輯
 """
 
 import json
@@ -125,14 +155,21 @@ class StorageBackend(ABC):
 
 
 class SQLiteStorage(StorageBackend):
-    """SQLite 儲存後端"""
+    """SQLite 儲存後端：生產環境推薦，支援查詢、更新、風味關聯查詢。
+
+    連線設定說明：
+    - row_factory = sqlite3.Row：讓查詢結果支援欄位名稱存取（dict-like）
+    - PRAGMA foreign_keys = ON：SQLite 預設不強制 FK，需明確啟用
+    - PRAGMA journal_mode = WAL：Write-Ahead Logging，允許讀寫同時進行
+      （比預設的 DELETE journal 在並發場景更穩定）
+    """
 
     def __init__(self, db_path: str = "distiller.db"):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
-        self.conn.execute("PRAGMA foreign_keys = ON")
-        self.conn.execute("PRAGMA journal_mode = WAL")
+        self.conn.execute("PRAGMA foreign_keys = ON")   # 強制 FK 約束
+        self.conn.execute("PRAGMA journal_mode = WAL")  # 讀寫分離，提升並發效能
         self._init_schema()
 
     def _init_schema(self):
@@ -174,7 +211,17 @@ class SQLiteStorage(StorageBackend):
         }
 
     def _upsert(self, cursor: sqlite3.Cursor, row: Dict) -> int:
-        """INSERT 或 UPDATE，回傳 spirit id（始終透過 SELECT 確保正確性）"""
+        """INSERT 或 UPDATE，回傳 spirit id。
+
+        設計理由——為何不用 INSERT OR REPLACE？
+        - INSERT OR REPLACE 會刪除舊紀錄再插入，spirit_id 會改變
+          → flavor_profiles 的 FOREIGN KEY 會 CASCADE DELETE，風味資料遺失
+        - 改用 SELECT 判斷 + 手動 UPDATE/INSERT，確保 id 不變且 FK 安全
+
+        spirit_id 的取得策略：
+        - 更新已存在的紀錄時：從 SELECT 結果取得原始 id
+        - 新插入的紀錄：從 cursor.lastrowid 取得自動遞增的 id
+        """
         existing = cursor.execute(
             "SELECT id FROM spirits WHERE url = ?", (row["url"],)
         ).fetchone()
@@ -215,12 +262,20 @@ class SQLiteStorage(StorageBackend):
         return spirit_id
 
     def _save_flavors(self, cursor: sqlite3.Cursor, spirit_id: int, flavor_data: Any):
-        """將 flavor_data dict 寫入 flavor_profiles 表"""
+        """將 flavor_data dict 寫入 flavor_profiles 資料表。
+
+        設計理由——先 DELETE 再 INSERT：
+        - 更新場景下，風味資料可能新增或移除維度（如網站改版）
+        - 逐一比對新舊差異比較複雜，直接刪除再批次插入更簡單可靠
+        - executemany 批次插入效率遠高於逐筆 execute
+        """
         if not isinstance(flavor_data, dict) or not flavor_data:
             return
+        # 先刪除此 spirit 的舊風味資料（更新時確保資料一致）
         cursor.execute(
             "DELETE FROM flavor_profiles WHERE spirit_id = ?", (spirit_id,)
         )
+        # 批次插入新風味資料
         cursor.executemany(
             "INSERT INTO flavor_profiles (spirit_id, flavor_name, flavor_value) VALUES (?, ?, ?)",
             [(spirit_id, k, v) for k, v in flavor_data.items()],

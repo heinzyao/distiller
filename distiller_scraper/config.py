@@ -1,37 +1,64 @@
 """
-爬蟲配置檔
+爬蟲配置檔：集中管理 Distiller.com 爬蟲的所有可調參數。
+
+設計理由
+--------
+使用類別常數而非 dataclass/Pydantic Settings，原因：
+- 爬蟲參數在執行期間不需要動態修改（非 mutable state）
+- 類別存取語法（ScraperConfig.MAX_SPIRITS_PER_CATEGORY）比 settings.xxx 更明確
+- 不需要型別驗證或環境變數注入，純粹是工程調參
+
+延遲設定的設計邏輯
+------------------
+- DELAY_MIN / DELAY_MAX：每筆詳情爬取之間的隨機延遲，模擬人類行為，降低被封鎖風險
+- SCROLL_DELAY：頁面滾動後的等待時間，給予 JavaScript lazy-loading 完成的時間
+- INITIAL_PAGE_DELAY：頁面初次載入後的等待，確保 React/Next.js 完成水合（hydration）
+- CATEGORY_DELAY：類別間的延遲，讓伺服器有恢復時間，也避免連續請求觸發速率限制
+
+分頁停止條件（三道防線）
+------------------------
+1. DUPLICATE_RATIO_THRESHOLD（0.8）：若一頁中 80% 以上是已知 URL → 接近資料邊界
+2. MAX_CONSECUTIVE_DUP_PAGES（3）：連續 3 頁完全沒有新 URL → 確定到達邊界
+3. MAX_PAGES_PER_QUERY（50）：硬上限，防止無限翻頁（異常情況的安全閥）
+
+風格 ID 的來源
+--------------
+WHISKEY_STYLES / GIN_STYLES 等清單中的 ID 是從 Distiller.com 的 HTML
+`<select name='spirit_style_id'>` 元素提取。每個 ID 對應一個烈酒子風格，
+透過多個風格 ID 分頁查詢，可收錄到遠超單一分類查詢上限的烈酒數量。
 """
 
 
 class ScraperConfig:
-    """爬蟲設定"""
+    """爬蟲設定：所有可調參數的集中管理。"""
 
-    # 瀏覽器設定
-    HEADLESS = True
-    WINDOW_SIZE = "1920,1080"
-    PAGE_LOAD_TIMEOUT = 60
-    ELEMENT_WAIT_TIMEOUT = 30
+    # ── 瀏覽器設定 ──
+    HEADLESS = True             # 無頭模式：不顯示瀏覽器視窗（生產環境建議 True）
+    WINDOW_SIZE = "1920,1080"   # 視窗尺寸：影響頁面 layout 與元素可見性
+    PAGE_LOAD_TIMEOUT = 60      # 頁面載入逾時（秒），Distiller 部分頁面較慢
+    ELEMENT_WAIT_TIMEOUT = 30   # 等待元素出現的逾時（秒），用於 Selenium WebDriverWait
 
-    # 延遲設定 (秒)
-    DELAY_MIN = 2
-    DELAY_MAX = 4
-    CATEGORY_DELAY = 8
-    SCROLL_DELAY = 2
-    INITIAL_PAGE_DELAY = 5
+    # ── 延遲設定（秒）──
+    # 延遲的設計理由：模擬人類瀏覽行為，降低被網站封鎖的機率
+    DELAY_MIN = 2               # 爬取間隨機延遲下限（秒）
+    DELAY_MAX = 4               # 爬取間隨機延遲上限（秒）
+    CATEGORY_DELAY = 8          # 類別切換時的等待時間（讓伺服器有恢復時間）
+    SCROLL_DELAY = 2            # 頁面滾動後的等待時間（等 JavaScript lazy-load 完成）
+    INITIAL_PAGE_DELAY = 5      # 頁面初次載入後的等待（等 React hydration 完成）
 
-    # 爬取設定
-    MAX_SPIRITS_PER_CATEGORY = 150
-    MAX_SCROLL_ATTEMPTS = 15
-    MAX_RETRIES = 3
+    # ── 爬取上限 ──
+    MAX_SPIRITS_PER_CATEGORY = 150  # 每類別最多爬取的烈酒數量
+    MAX_SCROLL_ATTEMPTS = 15        # 滾動模式下最多滾動次數（避免無限滾動）
+    MAX_RETRIES = 3                 # 單一 URL 的最大重試次數（應對 session 斷開）
 
-    # 分頁設定
-    PAGINATION_ENABLED = True       # 預設啟用分頁模式
-    MAX_PAGES_PER_QUERY = 50        # 單一查詢最多翻頁數
-    PAGE_PARAM = "page"             # URL 分頁參數名稱
-    # 停止分頁的判斷條件
-    MIN_NEW_URLS_PER_PAGE = 2       # 每頁至少需取得此數量的新 URL
-    DUPLICATE_RATIO_THRESHOLD = 0.8 # 重複 URL 比例超過此值時停止
-    MAX_CONSECUTIVE_DUP_PAGES = 3   # 連續 N 頁全為已知 URL 時停止分頁
+    # ── 分頁設定 ──
+    PAGINATION_ENABLED = True       # 預設啟用分頁模式（比滾動模式可爬取更多資料）
+    MAX_PAGES_PER_QUERY = 50        # 單一查詢最多翻頁數（安全閥，防無限翻頁）
+    PAGE_PARAM = "page"             # URL 分頁參數名稱（?page=N）
+    # 停止分頁的判斷條件（三道防線）
+    MIN_NEW_URLS_PER_PAGE = 2       # 每頁至少需取得此數量的新 URL（否則意義不大）
+    DUPLICATE_RATIO_THRESHOLD = 0.8 # 重複 URL 比例超過此值時停止（接近資料邊界）
+    MAX_CONSECUTIVE_DUP_PAGES = 3   # 連續 N 頁全為已知 URL 時停止分頁（確定到達邊界）
 
     # 類別列表
     CATEGORIES = [

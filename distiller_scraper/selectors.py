@@ -1,7 +1,26 @@
 """
-CSS 選擇器定義
-基於 2026-01-27 對 Distiller.com 的實際 HTML 結構分析
-已驗證選擇器與實際網站 HTML 匹配
+CSS 選擇器與資料提取工具：基於 2026-01-27 對 Distiller.com 的實際 HTML 結構分析。
+
+設計理由——為何獨立出此模組？
+- 選擇器是爬蟲最易損壞的部分（網站改版即失效），獨立後只需修改此一處
+- DataExtractor 的靜態方法設計方便測試（不需初始化，直接傳入 soup 物件）
+- SearchURLBuilder 集中管理 URL 構建邏輯，避免各處手拼字串出錯
+
+CSS 選擇器維護注意事項
+----------------------
+Distiller.com 的 HTML 使用 BEM 命名慣例（.spirit-badge, .distiller-score 等），
+這類語意型 class 名稱相對穩定。但若網站大改版，需重新驗證以下關鍵選擇器：
+1. Selectors.NAME（品名）
+2. Selectors.EXPERT_SCORE（專家評分）
+3. Selectors.FLAVOR_CHART（風味圖譜 data-flavors 屬性）
+4. Selectors.SPIRIT_LIST_ITEM（搜索結果列表項目）
+
+風味圖譜的提取策略
+------------------
+Distiller.com 使用 Chart.js 渲染風味雷達圖，資料存在：
+<canvas class='js-flavor-profile-chart' data-flavors='{"smoky": 85, "fruity": 60, ...}'>
+DataExtractor.extract_flavor_profile() 直接從 data-flavors 屬性解析 JSON，
+無需執行 JavaScript 即可取得完整風味資料。
 """
 
 import json
