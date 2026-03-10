@@ -19,6 +19,30 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-03-10 | Claude Code
+
+**工作內容**：
+1. **Chrome 145 renderer timeout 修復**
+   - 根因：Distiller.com React 應用持續發送背景 XHR 請求，導致 `document.readyState` 永遠不觸發 `load` 事件 → Selenium 等待 60 秒後 timeout
+   - 症狀：3/10 凌晨排程 28 次 "Timed out receiving message from renderer"，0 筆資料
+   - **Fix 1**：`page_load_strategy = "none"` — 不等待 load 事件，改以固定延遲（`INITIAL_PAGE_DELAY`）等待 React 渲染完成
+   - **Fix 2**：新增反偵測選項（`--disable-blink-features=AutomationControlled`、`excludeSwitches`、`useAutomationExtension=False`），避免被反爬蟲機制封鎖
+   - **Fix 3**：User-Agent 更新為 `Chrome/145.0.0.0`，與實際版本一致
+
+2. **驗證**
+   - test mode：5 筆成功，頁面載入失敗 0 次
+   - medium mode：頁面載入 ~7 秒（修復前 60 秒 timeout），4 筆新資料，頁面載入失敗 0 次
+   - 297 個測試全數通過
+
+**主要變更**：
+- 修改 `distiller_scraper/scraper.py`（新增 `page_load_strategy='none'` + 反偵測選項）
+- 修改 `distiller_scraper/config.py`（User-Agent 更新為 Chrome/145）
+- **總計：297 個測試全數通過**
+
+**Commit**：`d97641d`
+
+---
+
 ### 2026-03-09 | OpenCode Sisyphus
 
 **工作內容**：

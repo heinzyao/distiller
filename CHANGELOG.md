@@ -2,6 +2,19 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.5.2] - 2026-03-10
+
+### 修復
+- **Chrome 145 renderer timeout**：3/10 凌晨排程 28 次頁面 timeout（0 筆資料）根治
+  - 根因：Distiller.com React 應用持續發送背景 XHR，`document.readyState` 永遠不觸發 `load` 事件
+  - 新增 `page_load_strategy = 'none'`：不等待 load 事件，以固定延遲（`INITIAL_PAGE_DELAY`）等待 React 渲染
+  - 新增反偵測選項：`--disable-blink-features=AutomationControlled`、`excludeSwitches`、`useAutomationExtension=False`
+  - User-Agent 更新為 `Chrome/145.0.0.0`（與實際版本一致）
+
+### 驗證
+- medium mode 頁面載入從 60 秒 timeout → ~7 秒正常載入，頁面載入失敗 0 次
+- **總計：297 個測試全數通過**
+
 ## [2.5.1] - 2026-03-09
 
 ### 修復
