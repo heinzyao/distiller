@@ -504,7 +504,7 @@ class DistillerScraperV2:
 
         try:
             self.driver.get(url)
-            time.sleep(2)  # 等待頁面載入
+            time.sleep(ScraperConfig.INITIAL_PAGE_DELAY)  # 等待 React 渲染完成
 
             soup = BeautifulSoup(self.driver.page_source, "html.parser")
 
