@@ -135,9 +135,17 @@ class DistillerScraperV2:
             options.add_argument("--disable-gpu")           # 無頭環境無 GPU
             options.add_argument(f"--window-size={ScraperConfig.WINDOW_SIZE}")
             options.add_argument(f"user-agent={ScraperConfig.USER_AGENT}")
+            # 反偵測：移除 navigator.webdriver 標記，避免被反爬蟲機制封鎖
+            options.add_argument("--disable-blink-features=AutomationControlled")
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option("useAutomationExtension", False)
 
             # 啟用 Performance Logging：捕獲所有 Network 事件，用於 XHR API 探測
             options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+            # page_load_strategy='none'：不等待 document.readyState='complete'
+            # 原因：Distiller.com 的 JS 會持續發送背景請求，導致頁面永遠不觸發 load 事件
+            # 改以固定延遲 (INITIAL_PAGE_DELAY) 等待 React 渲染完成
+            options.page_load_strategy = "none"
 
             # Selenium Manager 自動解析相容的 Chrome + chromedriver（Selenium 4.6+）
             self.driver = webdriver.Chrome(options=options)
