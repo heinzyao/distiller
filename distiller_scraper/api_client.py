@@ -260,9 +260,10 @@ class DistillerAPIClient:
         """從 XHR URL 列表中篩選可能是 JSON API 的候選，並去重排序"""
         seen, candidates = set(), []
         for url in xhr_urls:
-            if self.BASE_URL not in url:
-                continue
             parsed = urlparse(url)
+            # 只接受 distiller.com 網域（排除第三方分析工具把 distiller.com 當 query 參數帶入）
+            if parsed.netloc != "distiller.com":
+                continue
             # 排除靜態資源
             if any(
                 parsed.path.endswith(ext)
