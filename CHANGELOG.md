@@ -10,9 +10,12 @@
   - 新增 `page_load_strategy = 'none'`：不等待 load 事件，以固定延遲（`INITIAL_PAGE_DELAY`）等待 React 渲染
   - 新增反偵測選項：`--disable-blink-features=AutomationControlled`、`excludeSwitches`、`useAutomationExtension=False`
   - User-Agent 更新為 `Chrome/145.0.0.0`（與實際版本一致）
+- **詳情頁渲染等待不足**：`scrape_spirit_detail()` 原用 `time.sleep(2)` 等待頁面，`page_load_strategy='none'` 後不足以等 React 水合，改為 `INITIAL_PAGE_DELAY = 5` 秒
+- **API 誤識別第三方 URL**：`_extract_json_candidates()` 用字串包含判斷 `BASE_URL in url`，第三方分析工具（Yahoo Analytics）因 query 參數含 `distiller.com` 而通過篩選，所有查詢回傳 0 筆；改為比對 `urlparse(url).netloc == "distiller.com"`
 
 ### 驗證
-- medium mode 頁面載入從 60 秒 timeout → ~7 秒正常載入，頁面載入失敗 0 次
+- full mode 正式執行：頁面載入失敗 0 次，4 筆新資料，exit code 0
+- medium mode 頁面載入從 60 秒 timeout → ~7 秒正常載入
 - **總計：297 個測試全數通過**
 
 ## [2.5.1] - 2026-03-09

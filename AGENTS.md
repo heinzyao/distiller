@@ -29,17 +29,25 @@
    - **Fix 2**：新增反偵測選項（`--disable-blink-features=AutomationControlled`、`excludeSwitches`、`useAutomationExtension=False`），避免被反爬蟲機制封鎖
    - **Fix 3**：User-Agent 更新為 `Chrome/145.0.0.0`，與實際版本一致
 
-2. **驗證**
-   - test mode：5 筆成功，頁面載入失敗 0 次
-   - medium mode：頁面載入 ~7 秒（修復前 60 秒 timeout），4 筆新資料，頁面載入失敗 0 次
+2. **詳情頁渲染等待不足修復**
+   - 根因：`scrape_spirit_detail()` 使用 `time.sleep(2)`，`page_load_strategy='none'` 後不足以等待 React 水合
+   - Fix：改為 `INITIAL_PAGE_DELAY = 5` 秒，與其他頁面一致
+
+3. **API 誤識別第三方 URL 修復**
+   - 根因：`_extract_json_candidates()` 用 `BASE_URL in url` 字串判斷，Yahoo Analytics 等第三方工具的 URL 因 query 參數含 `distiller.com` 而通過篩選 → 所有查詢回傳 0 筆 → Selenium fallback 被跳過
+   - Fix：改為 `urlparse(url).netloc == "distiller.com"`，確保只採用正確網域
+
+4. **正式執行驗證**
+   - full mode：頁面載入失敗 0 次，4 筆新資料，exit code 0，耗時 21 分鐘
    - 297 個測試全數通過
 
 **主要變更**：
-- 修改 `distiller_scraper/scraper.py`（新增 `page_load_strategy='none'` + 反偵測選項）
+- 修改 `distiller_scraper/scraper.py`（`page_load_strategy='none'`、反偵測選項、詳情頁延遲修正）
 - 修改 `distiller_scraper/config.py`（User-Agent 更新為 Chrome/145）
+- 修改 `distiller_scraper/api_client.py`（netloc 網域篩選）
 - **總計：297 個測試全數通過**
 
-**Commit**：`d97641d`
+**Commits**：`d97641d`、`7cb7ae1`、`2866ab6`
 
 ---
 
@@ -511,7 +519,10 @@ python run.py --mode full
 - [x] 爬蟲容錯修復（分頁 fallback 崩潰、per-category 錯誤隔離）✅ 2026-03-02
 - [x] 排程失敗根因修復（false failure + Chrome 版本不匹配 + page_errors 計數）✅ 2026-03-08
 - [x] 分頁 early-stop 邏輯修正（consecutive dup pages + 分離分頁有效性判斷）✅ 2026-03-09
+- [x] Chrome 145 renderer timeout 修復（page_load_strategy='none' + 反偵測 + User-Agent）✅ 2026-03-10
+- [x] 詳情頁渲染等待不足修復（2s → INITIAL_PAGE_DELAY）✅ 2026-03-10
+- [x] API 誤識別第三方 URL 修復（netloc 網域篩選）✅ 2026-03-10
 
 ---
 
-*最後更新：2026-03-09 by OpenCode Sisyphus*
+*最後更新：2026-03-11 by Claude Code*
