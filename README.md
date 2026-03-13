@@ -1,8 +1,225 @@
 # Distiller
 
+[English](#english) | [繁體中文](#繁體中文)
+
+---
+
+## English
+
+A Python web scraper project designed to extract liquor reviews and spirit profiles from [Distiller.com](https://distiller.com).
+
+### Features
+
+- Supports scraping multiple categories including Whiskey, Gin, Rum, Vodka, Brandy, Tequila/Mezcal, and Liqueurs.
+- Extracts comprehensive data: scores, flavor profiles, tasting notes, etc.
+- Employs a Headless Chrome mode for stability and efficiency.
+- Smart pagination scraping with automatic end-condition detection.
+- Automatic API endpoint discovery, significantly boosting scraping speed.
+- Multiple storage backends: CSV / SQLite / Both combined.
+- 297 automated tests with GitHub Actions CI/CD pipelines.
+
+### Project Structure
+
+```text
+distiller/
+├── distiller_scraper/         # Core Scraper Modules
+│   ├── scraper.py             # Main Scraper Class (DistillerScraperV2)
+│   ├── selectors.py           # CSS Selectors & SearchURLBuilder
+│   ├── config.py              # Configuration (constants, pagination logic)
+│   ├── storage.py             # Storage Backends (SQLiteStorage, CSVStorage)
+│   └── api_client.py          # API Endpoint Discovery Client
+├── data/                      # Centralized CSV Outputs (Auto-generated)
+├── bot.py                     # LINE Bot (Flask webhook, port 8000)
+├── query.py                   # CLI Query Tool
+├── scripts/
+│   ├── run_scraper.sh         # Scheduled Scraping Script
+│   └── run_bot.sh             # LINE Bot Launch Script (used for launchd)
+├── AGENTS.md                  # Multi-agent Collaboration Logs
+└── CHANGELOG.md               # Changelog
+```
+
+### Installation
+
+```bash
+uv sync
+```
+
+### Execution
+
+```bash
+# Test Mode (5 items, quick validation)
+python run.py --mode test
+
+# Medium Scale (~200 items, 4 categories)
+python run.py --mode medium
+
+# Full Scrape (1000+ items, 7 categories)
+python run.py --mode full
+```
+
+#### Output Formats
+
+```bash
+# CSV Output (Default), files are saved into the `data/` directory
+python run.py --mode test
+
+# SQLite Output
+python run.py --mode medium --output sqlite --db-path spirits.db
+
+# Dual CSV + SQLite Output, CSV goes to `data/`
+python run.py --mode full --output both
+```
+
+#### Advanced Options
+
+```bash
+# Enable API mode (Automatic endpoint discovery, much faster)
+python run.py --mode medium --use-api
+
+# Disable Pagination, using traditional infinite scroll scraping fallback
+python run.py --mode test --no-pagination
+
+# Combinations
+python run.py --mode full --output both --db-path spirits.db --use-api
+```
+
+#### Full CLI Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--mode` | Scrape mode: `test` (5 items) / `medium` (~200 items) / `full` (1000+ items) | `test` |
+| `--output` | Output format: `csv` / `sqlite` / `both` | `csv` |
+| `--db-path` | Path to the SQLite DB | `distiller.db` |
+| `--no-pagination` | Disables pagination mode, falls back to continuous scrolling | Active |
+| `--use-api` | Enables API mode (automatic endpoint discovery) | Disabled |
+
+### LINE Bot
+
+`bot.py` is a Flask Webhook service acting on port 8000. It receives LINE messages, queries the local SQLite spirit database, and sends replies back.
+
+```bash
+# Start Bot
+uv run python bot.py
+
+# Healthcheck
+curl http://localhost:8000/health
+```
+
+Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `help`
+
+### Testing
+
+```bash
+# Run Unit Tests and Integration Tests (Default, Fast)
+uv run pytest
+
+# Run only Unit Tests
+uv run pytest tests/unit
+
+# Run only Integration Tests
+uv run pytest tests/integration
+
+# Run all tests (Including End-to-End, Requires Network & Chrome)
+uv run pytest -m ""
+
+# Check coverage
+uv run pytest -v
+```
+
+### Data Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `name` | Spirit Name | Highland Park 18 Year |
+| `spirit_type` | Type | Single Malt |
+| `brand` | Brand | Highland Park |
+| `country` | Country of Origin | Scotland |
+| `age` | Age | 18 Year |
+| `abv` | ABV (Alcohol by Volume) | 43.0 |
+| `expert_score` | Expert Rating | 99 |
+| `community_score` | Community Rating | 4.47 |
+| `flavor_data` | Flavor Profile (JSON) | `{"smoky": 40, "sweet": 35}` |
+| `description` | Description | Rich and complex. |
+| `tasting_notes` | Tasting Notes | Honey and smoke. |
+
+### Architecture Outline
+
+#### Scraping Workflow
+
+```text
+scrape() Starts
+  ├─ start_driver()         Starts Headless Chrome
+  ├─ discover_api()         [Optional] Automatically discovers API endpoints
+  └─ scrape_category()      For each category
+       ├─ Pagination Mode (Default)
+       │    ├─ _get_search_queries()           Generates URLs for searching
+       │    ├─ _fetch_spirit_urls()             Fetches results list using API/Selenium
+       │    └─ scrape_spirit_detail()           Fetches spirit details using API/Selenium
+       └─ Scroll Mode (--no-pagination)
+            ├─ scroll_and_collect()             Collect URLs via infinite scrolling
+            └─ scrape_spirit_detail()           Scrapes items one by one
+```
+
+#### 3-Tier Fallback Mechanism
+
+When using `--use-api`, the system will automatically utilize backoff and logic cascading:
+
+1. **API Mode** (Fastest): Direct requests to unauthenticated JSON API endpoints.
+2. **Selenium Mode** (Reliable): Uses automated browser emulation.
+
+API Discovery Process:
+- Intercepts and parses XHR Network requests in Chrome Performance Log.
+- Analyzes candidate payloads (such as `/search.json`, `/api/v1/spirits/search`).
+- Probes and validates whether the found endpoints return functional JSON.
+
+#### Storage Backends
+
+| Backend | Applicable Scenarios |
+|---------|----------------------|
+| `CSVStorage` | Fast exports, tabular data analysis |
+| `SQLiteStorage` | Deduplication (upsert), joins/querying, persistent storage |
+
+The SQLite schema involves:
+- `spirits` Primary table (All fields + timestamps)
+- `flavor_profiles` Secondary table (Normalized flavor vectors)
+- `scrape_runs` Execution logs table
+
+#### Scheduling and Deduplication Pipeline
+
+`launchd` scheduling handles automated daily scrapes sequentially passing through 7 categories every night at 3:00 AM (`--mode full --output both --use-api`).
+To ensure idempotence and prevent overlapping data, a 5-layer deduplication logic is applied:
+
+| Layer | Mechanism | Description |
+|-------|-----------|-------------|
+| 1 | `seen_urls` preloading | Upon boot, all collected URLs form an in-memory Set from SQLite |
+| 2 | Item-level bypass | Before firing HTTP requests, verifies URL existence against `seen_urls` |
+| 3 | Category-level bypass| If a whole page comprises 100% existing DB items, jumps to the next category |
+| 4 | Duplication density | Evaluated from page 2. Paginating stops if the duplicate hitrate reaches ≥ 80% |
+| 5 | SQLite Upsert | Uses `UNIQUE` URL constraints; writes invoke an `ON CONFLICT` update |
+
+> **Note**: CSV output is handled inside an isolated scope and is distinct across runs inside the `data/` folder (only deduplicated intra-scrape). `SQLite` acts as the persistent global deduplication source constraint.
+
+### Collaboration Notice
+
+This project is built using a collaborative workflow of several AI agents. See [AGENTS.md](AGENTS.md).
+
+### Caveats and Constraints
+
+- Distiller.com populates its DOM dynamically through JavaScript; hence `Selenium` is required.
+- Please adhere to the terms and conditions outlined by the site owner. Keep request intervals reasonable without aggressive polling.
+- Make sure a standard Chrome browser is installed. The script leverages `webdriver-manager` to ensure the ChromeDriver is matching.
+
+### License
+
+MIT
+
+---
+
+## 繁體中文
+
 從 [Distiller.com](https://distiller.com) 爬取烈酒評論資料的 Python 爬蟲專案。
 
-## 功能特點
+### 功能特點
 
 - 支援 Whiskey、Gin、Rum、Vodka、Brandy、Tequila/Mezcal、Liqueurs 等多類別爬取
 - 提取完整資料：評分、風味圖譜、品飲筆記等
@@ -12,9 +229,9 @@
 - 多儲存後端：CSV / SQLite / 雙輸出
 - 297 個自動化測試，GitHub Actions CI/CD
 
-## 專案結構
+### 專案結構
 
-```
+```text
 distiller/
 ├── distiller_scraper/         # 核心爬蟲模組
 │   ├── scraper.py             # 主爬蟲類別 DistillerScraperV2
@@ -32,13 +249,13 @@ distiller/
 └── CHANGELOG.md               # 變更紀錄
 ```
 
-## 安裝
+### 安裝
 
 ```bash
 uv sync
 ```
 
-## 執行
+### 執行
 
 ```bash
 # 測試模式（5 筆，快速驗證）
@@ -51,7 +268,7 @@ python run.py --mode medium
 python run.py --mode full
 ```
 
-### 輸出格式
+#### 輸出格式
 
 ```bash
 # CSV 輸出（預設），檔案儲存於 data/ 目錄
@@ -64,7 +281,7 @@ python run.py --mode medium --output sqlite --db-path spirits.db
 python run.py --mode full --output both
 ```
 
-### 進階選項
+#### 進階選項
 
 ```bash
 # 啟用 API 模式（自動探測端點，速度更快）
@@ -77,7 +294,7 @@ python run.py --mode test --no-pagination
 python run.py --mode full --output both --db-path spirits.db --use-api
 ```
 
-### 完整 CLI 參數
+#### 完整 CLI 參數
 
 | 參數 | 說明 | 預設值 |
 |------|------|--------|
@@ -87,7 +304,7 @@ python run.py --mode full --output both --db-path spirits.db --use-api
 | `--no-pagination` | 停用分頁模式，改用傳統滾動爬取 | 啟用分頁 |
 | `--use-api` | 啟用 API 模式（自動探測端點） | 停用 |
 
-## LINE Bot
+### LINE Bot
 
 `bot.py` 是一個 Flask Webhook 服務（port 8000），接收 LINE 訊息並查詢烈酒資料庫回覆。
 
@@ -101,7 +318,7 @@ curl http://localhost:8000/health
 
 支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`說明`
 
-## 測試
+### 測試
 
 ```bash
 # 執行單元測試與整合測試（預設，快速）
@@ -120,7 +337,7 @@ uv run pytest -m ""
 uv run pytest -v
 ```
 
-## 資料欄位
+### 資料欄位
 
 | 欄位 | 說明 | 範例 |
 |------|------|------|
@@ -136,11 +353,11 @@ uv run pytest -v
 | `description` | 描述 | Rich and complex. |
 | `tasting_notes` | 品飲筆記 | Honey and smoke. |
 
-## 架構說明
+### 架構說明
 
-### 爬取流程
+#### 爬取流程
 
-```
+```text
 scrape() 啟動
   ├─ start_driver()         啟動 Headless Chrome
   ├─ discover_api()         [可選] 自動探測 API 端點
@@ -154,7 +371,7 @@ scrape() 啟動
             └─ scrape_spirit_detail()           逐筆爬取詳情
 ```
 
-### 三層備援機制
+#### 三層備援機制
 
 當啟用 `--use-api` 時，系統自動嘗試：
 
@@ -166,7 +383,7 @@ API 端點探索流程：
 - 分析候選路徑（`/search.json`, `/api/v1/spirits/search` 等）
 - 自動驗證端點是否回傳有效 JSON
 
-### 儲存後端
+#### 儲存後端
 
 | 後端 | 適用場景 |
 |------|----------|
@@ -178,7 +395,7 @@ SQLite schema 包含：
 - `flavor_profiles` 副表（正規化風味資料）
 - `scrape_runs` 執行記錄表
 
-### 排程與去重機制
+#### 排程與去重機制
 
 每日凌晨 3:00 由 launchd 排程執行完整爬取（`--mode full --output both --use-api`）。
 系統透過五層去重機制確保不會重複爬取已有資料：
@@ -193,16 +410,16 @@ SQLite schema 包含：
 
 > **注意**：CSV 輸出為每次執行獨立檔案，儲存於 `data/` 目錄，僅在單次執行內去重。SQLite 為跨執行的唯一去重來源。
 
-## 協作說明
+### 協作說明
 
 本專案由多個 AI 代理協作開發，詳見 [AGENTS.md](AGENTS.md)。
 
-## 注意事項
+### 注意事項
 
 - Distiller.com 使用 JavaScript 動態載入，需使用 Selenium
 - 請遵守網站使用條款，合理控制爬取頻率
 - 需要 Chrome 瀏覽器（webdriver-manager 會自動管理 ChromeDriver）
 
-## 授權條款
+### 授權條款
 
 MIT
