@@ -10,7 +10,7 @@
 - 智能分頁爬取，自動偵測停止條件
 - API 端點自動探索，大幅提升爬取速度
 - 多儲存後端：CSV / SQLite / 雙輸出
-- 259 個自動化測試，GitHub Actions CI/CD
+- 297 個自動化測試，GitHub Actions CI/CD
 
 ## 專案結構
 
@@ -28,7 +28,6 @@ distiller/
 ├── scripts/
 │   ├── run_scraper.sh         # 排程爬取腳本
 │   └── run_bot.sh             # Bot 啟動腳本（launchd 用）
-├── requirements.txt
 ├── AGENTS.md                  # 多代理協作紀錄
 └── CHANGELOG.md               # 變更紀錄
 ```
@@ -36,11 +35,7 @@ distiller/
 ## 安裝
 
 ```bash
-# 推薦：使用 uv（更快）
 uv sync
-
-# 或使用 pip
-pip install -r requirements.txt
 ```
 
 ## 執行
@@ -110,19 +105,19 @@ curl http://localhost:8000/health
 
 ```bash
 # 執行單元測試與整合測試（預設，快速）
-pytest
+uv run pytest
 
 # 只執行單元測試
-pytest tests/unit
+uv run pytest tests/unit
 
 # 只執行整合測試
-pytest tests/integration
+uv run pytest tests/integration
 
 # 執行所有測試（包含 E2E，需要網路與 Chrome）
-pytest -m ""
+uv run pytest -m ""
 
 # 查看覆蓋率
-pytest -v
+uv run pytest -v
 ```
 
 ## 資料欄位
