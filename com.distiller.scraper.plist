@@ -24,7 +24,7 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/Users/Henry/Project/distiller/venv/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>/Users/Henry/Project/distiller/.venv/bin:/usr/local/bin:/usr/bin:/bin</string>
         <key>HOME</key>
         <string>/Users/Henry</string>
     </dict>

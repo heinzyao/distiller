@@ -2,6 +2,15 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.5.3] - 2026-03-14
+
+### 修復
+- **排程腳本 venv 路徑錯誤**：`scripts/run_scraper.sh` 與 `com.distiller.scraper.plist` 的 Python 路徑寫死為 `venv/bin/python`，但專案使用 `uv` 管理的 `.venv`，導致 3/14 排程直接 exit 1、爬蟲未執行、LINE 通知未發送
+  - `run_scraper.sh`：`venv/bin/python` → `.venv/bin/python`
+  - `com.distiller.scraper.plist` PATH：`venv/bin` → `.venv/bin`
+  - 重新載入 launchd 排程（`launchctl unload/load`）
+- **LINE 通知 DNS 解析失敗（3/12、3/13）**：確認 LINE 憑證設定正確，手動測試通知發送成功；排程已固定 10:00 執行以規避凌晨 DNS 問題
+
 ## [2.5.2] - 2026-03-10
 
 ### 修復

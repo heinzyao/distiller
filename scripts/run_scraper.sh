@@ -15,7 +15,7 @@ if [ -f "$PROJECT_DIR/.env" ]; then
     set +a
 fi
 LOG_DIR="$PROJECT_DIR/logs"
-VENV_PYTHON="$PROJECT_DIR/venv/bin/python"
+VENV_PYTHON="$PROJECT_DIR/.venv/bin/python"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 
 # Create log directory if not exists
