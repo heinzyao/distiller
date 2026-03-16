@@ -162,3 +162,38 @@ class TestScraperConfigOutput:
     def test_output_encoding(self):
         """確認輸出編碼"""
         assert ScraperConfig.OUTPUT_ENCODING in ["utf-8", "utf-8-sig"]
+
+
+class TestScraperConfigFailureHandling:
+    """測試失敗處理與回復配置"""
+
+    def test_max_scroll_retries_exists_and_default(self):
+        """確認 MAX_SCROLL_RETRIES 存在且預設為 3"""
+        assert ScraperConfig.MAX_SCROLL_RETRIES == 3
+
+    def test_max_restart_attempts_exists_and_default(self):
+        """確認 MAX_RESTART_ATTEMPTS 存在且預設為 2"""
+        assert ScraperConfig.MAX_RESTART_ATTEMPTS == 2
+
+    def test_health_check_timeout_exists_and_default(self):
+        """確認 HEALTH_CHECK_TIMEOUT 存在且預設為 10"""
+        assert ScraperConfig.HEALTH_CHECK_TIMEOUT == 10
+
+    def test_page_retry_count_exists_and_default(self):
+        """確認 PAGE_RETRY_COUNT 存在且預設為 2"""
+        assert ScraperConfig.PAGE_RETRY_COUNT == 2
+
+    def test_restart_trigger_errors_exists_and_contains_expected(self):
+        """確認 RESTART_TRIGGER_ERRORS 包含既有和新的錯誤字串"""
+        triggers = ScraperConfig.RESTART_TRIGGER_ERRORS
+        assert isinstance(triggers, list)
+        assert len(triggers) >= 3
+        # 既有的觸發條件
+        assert "invalid session id" in triggers
+        assert "session deleted" in triggers
+        # 新增的 JS null 錯誤觸發條件
+        assert any("Cannot read properties of null" in t for t in triggers)
+
+    def test_duplicate_run_window_hours_exists_and_default(self):
+        """確認 DUPLICATE_RUN_WINDOW_HOURS 存在且預設為 20"""
+        assert ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS == 20
