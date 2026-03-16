@@ -1,0 +1,14 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- /Users/Henry/Project/Distiller/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/Henry/Project/distiller
+configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+plugins: mock-3.15.1
+collecting ... collected 4 items
+
+tests/unit/test_scroll_page.py::TestScrollPage::test_scroll_page_handles_null_body PASSED [ 25%]
+tests/unit/test_scroll_page.py::TestScrollPage::test_scroll_page_retries_on_null_body PASSED [ 50%]
+tests/unit/test_scroll_page.py::TestScrollPage::test_scroll_page_gives_up_after_max_retries PASSED [ 75%]
+tests/unit/test_scroll_page.py::TestScrollPage::test_scroll_page_normal_operation_unchanged PASSED [100%]
+
+============================== 4 passed in 0.22s ===============================

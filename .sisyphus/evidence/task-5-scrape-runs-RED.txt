@@ -1,0 +1,106 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- /Users/Henry/Project/Distiller/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/Henry/Project/distiller
+configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+plugins: mock-3.15.1
+collecting ... collected 5 items
+
+tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_recorded_on_start FAILED [ 20%]
+tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_finished_on_success FAILED [ 40%]
+tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_finished_on_failure FAILED [ 60%]
+tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_finished_on_partial_success FAILED [ 80%]
+tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_recorded_even_if_notification_fails FAILED [100%]
+
+=================================== FAILURES ===================================
+_______________ TestScrapeRuns.test_scrape_run_recorded_on_start _______________
+../../.local/share/uv/python/cpython-3.14.0-macos-aarch64-none/lib/python3.14/unittest/mock.py:964: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'record_scrape_run' to have been called once. Called 0 times.
+
+During handling of the above exception, another exception occurred:
+tests/unit/test_scrape_runs.py:66: in test_scrape_run_recorded_on_start
+    storage_mock.record_scrape_run.assert_called_once()
+E   AssertionError: Expected 'record_scrape_run' to have been called once. Called 0 times.
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+測試模式 - 爬取少量資料驗證功能
+================================================================================
+
+
+統計:
+{}
+______________ TestScrapeRuns.test_scrape_run_finished_on_success ______________
+../../.local/share/uv/python/cpython-3.14.0-macos-aarch64-none/lib/python3.14/unittest/mock.py:964: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+
+During handling of the above exception, another exception occurred:
+tests/unit/test_scrape_runs.py:94: in test_scrape_run_finished_on_success
+    storage_mock.finish_scrape_run.assert_called_once()
+E   AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+測試模式 - 爬取少量資料驗證功能
+================================================================================
+
+
+統計:
+{}
+______________ TestScrapeRuns.test_scrape_run_finished_on_failure ______________
+../../.local/share/uv/python/cpython-3.14.0-macos-aarch64-none/lib/python3.14/unittest/mock.py:964: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+
+During handling of the above exception, another exception occurred:
+tests/unit/test_scrape_runs.py:141: in test_scrape_run_finished_on_failure
+    storage_mock.finish_scrape_run.assert_called_once()
+E   AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+測試模式 - 爬取少量資料驗證功能
+================================================================================
+
+__________ TestScrapeRuns.test_scrape_run_finished_on_partial_success __________
+../../.local/share/uv/python/cpython-3.14.0-macos-aarch64-none/lib/python3.14/unittest/mock.py:964: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+
+During handling of the above exception, another exception occurred:
+tests/unit/test_scrape_runs.py:172: in test_scrape_run_finished_on_partial_success
+    storage_mock.finish_scrape_run.assert_called_once()
+E   AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+測試模式 - 爬取少量資料驗證功能
+================================================================================
+
+
+統計:
+{}
+______ TestScrapeRuns.test_scrape_run_recorded_even_if_notification_fails ______
+../../.local/share/uv/python/cpython-3.14.0-macos-aarch64-none/lib/python3.14/unittest/mock.py:964: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+
+During handling of the above exception, another exception occurred:
+tests/unit/test_scrape_runs.py:214: in test_scrape_run_recorded_even_if_notification_fails
+    storage_mock.finish_scrape_run.assert_called_once()
+E   AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+測試模式 - 爬取少量資料驗證功能
+================================================================================
+
+=========================== short test summary info ============================
+FAILED tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_recorded_on_start - AssertionError: Expected 'record_scrape_run' to have been called once. Called 0 times.
+FAILED tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_finished_on_success - AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+FAILED tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_finished_on_failure - AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+FAILED tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_finished_on_partial_success - AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+FAILED tests/unit/test_scrape_runs.py::TestScrapeRuns::test_scrape_run_recorded_even_if_notification_fails - AssertionError: Expected 'finish_scrape_run' to have been called once. Called 0 times.
+============================== 5 failed in 0.54s ===============================

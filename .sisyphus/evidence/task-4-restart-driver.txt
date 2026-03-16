@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- /Users/Henry/Project/Distiller/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/Henry/Project/distiller
+configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+plugins: mock-3.15.1
+collecting ... collected 6 items
+
+tests/unit/test_restart_driver.py::TestRestartDriver::test_should_restart_returns_true_for_js_null_error PASSED [ 16%]
+tests/unit/test_restart_driver.py::TestRestartDriver::test_should_restart_returns_true_for_invalid_session PASSED [ 33%]
+tests/unit/test_restart_driver.py::TestRestartDriver::test_should_restart_returns_true_for_session_deleted PASSED [ 50%]
+tests/unit/test_restart_driver.py::TestRestartDriver::test_should_restart_returns_false_for_unknown_error PASSED [ 66%]
+tests/unit/test_restart_driver.py::TestRestartDriver::test_restart_count_increments_after_restart PASSED [ 83%]
+tests/unit/test_restart_driver.py::TestRestartDriver::test_driver_failed_set_when_max_attempts_exceeded PASSED [100%]
+
+============================== 6 passed in 0.23s ===============================
