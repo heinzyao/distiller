@@ -7,9 +7,10 @@ Distiller 爬蟲 V2 執行腳本
 
 import argparse
 import json
+import logging
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # 加入專案路徑
@@ -20,9 +21,33 @@ DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 from distiller_scraper.api_client import DistillerAPIClient
+from distiller_scraper.config import ScraperConfig
 from distiller_scraper.notify import LineNotifier
 from distiller_scraper.scraper import DistillerScraperV2
 from distiller_scraper.storage import CSVStorage, SQLiteStorage
+
+logger = logging.getLogger(__name__)
+
+
+def _should_skip_run(storage) -> bool:
+    """Return True if a recent successful run exists (fail-open on DB error)."""
+    if not isinstance(storage, SQLiteStorage):
+        return False
+    try:
+        cutoff = datetime.now() - timedelta(hours=ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS)
+        row = storage.conn.execute(
+            "SELECT started_at FROM scrape_runs"
+            " WHERE status IN ('completed', 'completed_with_errors')"
+            " AND started_at >= ? ORDER BY started_at DESC LIMIT 1",
+            (cutoff.isoformat(),),
+        ).fetchone()
+        if row:
+            logger.info(f"Recent successful run found at {row[0]}, skipping")
+            return True
+        return False
+    except Exception as e:
+        logger.warning(f"Duplicate check failed, proceeding: {e}")
+        return False  # fail-open
 
 
 def _use_pagination(args) -> bool:
@@ -58,14 +83,32 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
     print("=" * 80 + "\n")
 
     storage, csv_file = _build_storage(output, db_path, str(DATA_DIR / "distiller_test_v2.csv"))
+    if _should_skip_run(storage):
+        print("⏭️  Recent successful run found, skipping")
+        return True, {}
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
-    scrape_ok = scraper.scrape(
-        categories=["whiskey"],
-        max_per_category=5,
-        use_styles=False,
-        use_pagination=_use_pagination(args),
-    )
+    run_id = None
+    if isinstance(storage, SQLiteStorage):
+        run_id = storage.record_scrape_run(categories=["whiskey"], mode="test")
+
+    status = "completed"
+    try:
+        scrape_ok = scraper.scrape(
+            categories=["whiskey"],
+            max_per_category=5,
+            use_styles=False,
+            use_pagination=_use_pagination(args),
+        )
+        has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
+        if has_errors:
+            status = "completed_with_errors"
+    except Exception:
+        status = "failed"
+        raise
+    finally:
+        if run_id is not None and isinstance(storage, SQLiteStorage):
+            storage.finish_scrape_run(run_id, len(scraper.spirits_data), len(scraper.failed_urls), status)
 
     if csv_file:
         scraper.save_csv(csv_file)
@@ -74,11 +117,9 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    # Success = scrape completed AND (found data OR cleanly deduped with no errors)
     has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
     success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
     return success, stats
-
 
 def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
     """中等規模爬取 (每類別 50 筆，共約 200 筆)"""
@@ -90,14 +131,33 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
     storage, csv_file = _build_storage(
         output, db_path, str(DATA_DIR / f"distiller_spirits_{timestamp}.csv")
     )
+    if _should_skip_run(storage):
+        print("⏭️  Recent successful run found, skipping")
+        return True, {}
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
-    scrape_ok = scraper.scrape(
-        categories=["whiskey", "gin", "rum", "vodka"],
-        max_per_category=50,
-        use_styles=True,
-        use_pagination=_use_pagination(args),
-    )
+    _medium_categories = ["whiskey", "gin", "rum", "vodka"]
+    run_id = None
+    if isinstance(storage, SQLiteStorage):
+        run_id = storage.record_scrape_run(categories=_medium_categories, mode="medium")
+
+    status = "completed"
+    try:
+        scrape_ok = scraper.scrape(
+            categories=_medium_categories,
+            max_per_category=50,
+            use_styles=True,
+            use_pagination=_use_pagination(args),
+        )
+        has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
+        if has_errors:
+            status = "completed_with_errors"
+    except Exception:
+        status = "failed"
+        raise
+    finally:
+        if run_id is not None and isinstance(storage, SQLiteStorage):
+            storage.finish_scrape_run(run_id, len(scraper.spirits_data), len(scraper.failed_urls), status)
 
     if csv_file:
         scraper.save_csv(csv_file)
@@ -106,11 +166,9 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    # Success = scrape completed AND (found data OR cleanly deduped with no errors)
     has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
     success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
     return success, stats
-
 
 def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
     """完整爬取 (每類別 150 筆，共約 1000+ 筆)"""
@@ -122,22 +180,41 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
     storage, csv_file = _build_storage(
         output, db_path, str(DATA_DIR / f"distiller_spirits_full_{timestamp}.csv")
     )
+    if _should_skip_run(storage):
+        print("⏭️  Recent successful run found, skipping")
+        return True, {}
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
-    scrape_ok = scraper.scrape(
-        categories=[
-            "whiskey",
-            "gin",
-            "rum",
-            "vodka",
-            "brandy",
-            "tequila-mezcal",
-            "liqueurs-bitters",
-        ],
-        max_per_category=150,
-        use_styles=True,
-        use_pagination=_use_pagination(args),
-    )
+    _full_categories = [
+        "whiskey",
+        "gin",
+        "rum",
+        "vodka",
+        "brandy",
+        "tequila-mezcal",
+        "liqueurs-bitters",
+    ]
+    run_id = None
+    if isinstance(storage, SQLiteStorage):
+        run_id = storage.record_scrape_run(categories=_full_categories, mode="full")
+
+    status = "completed"
+    try:
+        scrape_ok = scraper.scrape(
+            categories=_full_categories,
+            max_per_category=150,
+            use_styles=True,
+            use_pagination=_use_pagination(args),
+        )
+        has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
+        if has_errors:
+            status = "completed_with_errors"
+    except Exception:
+        status = "failed"
+        raise
+    finally:
+        if run_id is not None and isinstance(storage, SQLiteStorage):
+            storage.finish_scrape_run(run_id, len(scraper.spirits_data), len(scraper.failed_urls), status)
 
     if csv_file:
         scraper.save_csv(csv_file)
@@ -146,11 +223,9 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    # Success = scrape completed AND (found data OR cleanly deduped with no errors)
     has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
     success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
     return success, stats
-
 
 def main():
     parser = argparse.ArgumentParser(description="Distiller.com 爬蟲 V2")

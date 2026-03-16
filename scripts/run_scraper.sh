@@ -15,7 +15,6 @@ if [ -f "$PROJECT_DIR/.env" ]; then
     set +a
 fi
 LOG_DIR="$PROJECT_DIR/logs"
-VENV_PYTHON="$PROJECT_DIR/.venv/bin/python"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 
 # Create log directory if not exists
@@ -32,11 +31,6 @@ echo "Distiller Scraper - Scheduled Run" | tee -a "$LOG_FILE"
 echo "Start Time: $(date)" | tee -a "$LOG_FILE"
 echo "==========================================" | tee -a "$LOG_FILE"
 
-# Check if virtual environment exists
-if [ ! -f "$VENV_PYTHON" ]; then
-    echo "❌ Error: Virtual environment not found at $VENV_PYTHON" | tee -a "$LOG_FILE"
-    exit 1
-fi
 
 # Check if run.py exists
 if [ ! -f "$PROJECT_DIR/run.py" ]; then
@@ -46,7 +40,9 @@ fi
 
 # Run the scraper with full mode
 echo "Starting scraper in FULL mode..." | tee -a "$LOG_FILE"
-if "$VENV_PYTHON" run.py --mode full --output both --use-api --notify-line 2>&1 | tee -a "$LOG_FILE"; then
+uv run python run.py --mode full --output both --use-api --notify-line 2>&1 | tee -a "$LOG_FILE"
+EXIT_CODE=${PIPESTATUS[0]}
+if [ "$EXIT_CODE" -eq 0 ]; then
     echo "" | tee -a "$LOG_FILE"
     echo "✅ Scraper completed successfully!" | tee -a "$LOG_FILE"
     echo "End Time: $(date)" | tee -a "$LOG_FILE"
@@ -60,7 +56,7 @@ if "$VENV_PYTHON" run.py --mode full --output both --use-api --notify-line 2>&1 
     
 else
     echo "" | tee -a "$LOG_FILE"
-    echo "❌ Scraper failed with exit code $?" | tee -a "$LOG_FILE"
+    echo "❌ Scraper failed with exit code $EXIT_CODE" | tee -a "$LOG_FILE"
     echo "End Time: $(date)" | tee -a "$LOG_FILE"
     echo "Log saved to: $LOG_FILE" | tee -a "$LOG_FILE"
     
