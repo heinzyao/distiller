@@ -122,6 +122,19 @@ class ScraperConfig:
         ("38", "Mexico"),
     ]
 
+    # ── 失敗處理與回復 (Failure Handling & Recovery) ──
+    MAX_SCROLL_RETRIES = 3          # scroll_page() 遇到 null body 時的最大重試次數
+    MAX_RESTART_ATTEMPTS = 2        # 單次爬取中 driver 重啟的最大次數（超過則放棄）
+    HEALTH_CHECK_TIMEOUT = 10       # 健康檢查頁面載入逾時（秒）
+    PAGE_RETRY_COUNT = 2            # 單一頁面失敗時的重試次數
+    RESTART_TRIGGER_ERRORS = [      # 觸發 driver 重啟的錯誤字串（任一子字串匹配即觸發）
+        "invalid session id",       # Selenium session 過期
+        "session deleted",          # Chrome 主動斷開 session
+        "Cannot read properties of null",  # JS null body (document.body 為 null)
+        "null is not an object",    # Safari 風格 JS null 錯誤（防禦性）
+    ]
+    DUPLICATE_RUN_WINDOW_HOURS = 20 # 重複執行檢測窗口（小時），窗口內有成功執行則跳過
+
     # User-Agent
     USER_AGENT = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

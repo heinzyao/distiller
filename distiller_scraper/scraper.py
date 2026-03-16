@@ -50,6 +50,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 import pandas as pd
+from selenium.common.exceptions import JavascriptException, TimeoutException
 from bs4 import BeautifulSoup
 
 from .api_client import DistillerAPIClient
@@ -98,13 +99,13 @@ class DistillerScraperV2:
         self.api_client = api_client
         self.driver: Optional[Any] = None  # webdriver.Chrome，延遲導入以加速初始化
         self.spirits_data: List[Dict] = []  # 本次執行爬取的所有結果（記憶體暫存）
-        self.failed_urls: List[str] = []    # 爬取失敗的 URL 列表（用於事後重試或除錯）
-        self.page_errors: int = 0           # 頁面載入失敗計數（timeout 等非 URL 問題）
+        self.failed_urls: List[str] = []  # 爬取失敗的 URL 列表（用於事後重試或除錯）
+        self.page_errors: int = 0  # 頁面載入失敗計數（timeout 等非 URL 問題）
+        self.restart_count: int = 0
+        self.driver_failed: bool = False
         # 去重集合：有 storage 時從 DB 載入已知 URLs，避免重複爬取
         # 設計理由：記憶體 Set 查詢 O(1)，遠比每次爬取前都 DB 查詢更有效率
-        self.seen_urls: Set[str] = (
-            storage.get_existing_urls() if storage else set()
-        )
+        self.seen_urls: Set[str] = storage.get_existing_urls() if storage else set()
 
     def start_driver(self) -> bool:
         """啟動 Chrome WebDriver。
@@ -128,11 +129,13 @@ class DistillerScraperV2:
             options = ChromeOptions()
 
             if self.headless:
-                options.add_argument("--headless=new")  # 新版無頭模式，更接近真實瀏覽器行為
+                options.add_argument(
+                    "--headless=new"
+                )  # 新版無頭模式，更接近真實瀏覽器行為
 
-            options.add_argument("--no-sandbox")           # Docker 環境必需
+            options.add_argument("--no-sandbox")  # Docker 環境必需
             options.add_argument("--disable-dev-shm-usage")  # 避免共享記憶體不足崩潰
-            options.add_argument("--disable-gpu")           # 無頭環境無 GPU
+            options.add_argument("--disable-gpu")  # 無頭環境無 GPU
             options.add_argument(f"--window-size={ScraperConfig.WINDOW_SIZE}")
             options.add_argument(f"user-agent={ScraperConfig.USER_AGENT}")
             # 反偵測：移除 navigator.webdriver 標記，避免被反爬蟲機制封鎖
@@ -174,7 +177,19 @@ class DistillerScraperV2:
     def scroll_page(self, max_scrolls: int = None):
         """滾動頁面載入更多內容"""
         max_scrolls = max_scrolls or ScraperConfig.MAX_SCROLL_ATTEMPTS
-        last_height = self.driver.execute_script("return document.body.scrollHeight")
+        for attempt in range(ScraperConfig.MAX_SCROLL_RETRIES):
+            try:
+                last_height = self.driver.execute_script(
+                    "return document.body.scrollHeight"
+                )
+                break
+            except JavascriptException as exc:
+                if attempt == ScraperConfig.MAX_SCROLL_RETRIES - 1:
+                    logger.error(f"scrollPage 取得 scrollHeight 失敗，已放棄: {exc}")
+                    self.page_errors += 1
+                    return
+                logger.warning(f"scrollPage 取得 scrollHeight 失敗，準備重試: {exc}")
+                time.sleep(1)
 
         for i in range(max_scrolls):
             self.driver.execute_script(
@@ -182,7 +197,23 @@ class DistillerScraperV2:
             )
             time.sleep(ScraperConfig.SCROLL_DELAY)
 
-            new_height = self.driver.execute_script("return document.body.scrollHeight")
+            for attempt in range(ScraperConfig.MAX_SCROLL_RETRIES):
+                try:
+                    new_height = self.driver.execute_script(
+                        "return document.body.scrollHeight"
+                    )
+                    break
+                except JavascriptException as exc:
+                    if attempt == ScraperConfig.MAX_SCROLL_RETRIES - 1:
+                        logger.error(
+                            f"scrollPage 取得 scrollHeight 失敗，已放棄: {exc}"
+                        )
+                        self.page_errors += 1
+                        return
+                    logger.warning(
+                        f"scrollPage 取得 scrollHeight 失敗，準備重試: {exc}"
+                    )
+                    time.sleep(1)
             if new_height == last_height:
                 logger.debug(f"滾動完成，共 {i + 1} 次")
                 break
@@ -220,6 +251,33 @@ class DistillerScraperV2:
             logger.error(f"重新啟動 WebDriver 失敗: {e}")
             return False
 
+    def _should_restart(self, error_msg: str) -> bool:
+        return any(
+            trigger in error_msg for trigger in ScraperConfig.RESTART_TRIGGER_ERRORS
+        )
+
+    def _health_check(self) -> bool:
+        """頁面健康檢查：在爬取前確認瀏覽器與目標網站可正常存取。"""
+        url = (
+            ScraperConfig.BASE_URL
+            if hasattr(ScraperConfig, "BASE_URL")
+            else "https://distiller.com"
+        )
+        try:
+            self.driver.set_page_load_timeout(ScraperConfig.HEALTH_CHECK_TIMEOUT)
+            self.driver.get(url)
+            self.driver.execute_script("return document.body.scrollHeight")
+            return True
+        except TimeoutException as e:
+            logger.error(f"健康檢查失敗（逾時）: {e}")
+            return False
+        except JavascriptException as e:
+            logger.error(f"健康檢查失敗（JavaScript 錯誤）: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"健康檢查失敗: {e}")
+            return False
+
     def capture_xhr_requests(self, url: str, scroll_count: int = 3) -> List[str]:
         """
         瀏覽指定頁面並捕獲滾動觸發的 XHR/Fetch 請求 URL。
@@ -236,7 +294,9 @@ class DistillerScraperV2:
 
             # 滾動觸發可能的 XHR 請求
             for _ in range(scroll_count):
-                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                self.driver.execute_script(
+                    "window.scrollTo(0, document.body.scrollHeight);"
+                )
                 time.sleep(ScraperConfig.SCROLL_DELAY)
 
             # 讀取 performance log
@@ -261,15 +321,13 @@ class DistillerScraperV2:
             logger.warning(f"捕獲 XHR 請求失敗: {e}")
             return []
 
-    def _get_search_queries(
-        self, category: str, use_styles: bool
-    ) -> List[tuple]:
+    def _get_search_queries(self, category: str, use_styles: bool) -> List[tuple]:
         """回傳此類別要查詢的 (base_url, label) 列表"""
         style_map = {
             "whiskey": ScraperConfig.WHISKEY_STYLES,
-            "gin":     ScraperConfig.GIN_STYLES,
-            "rum":     ScraperConfig.RUM_STYLES,
-            "vodka":   ScraperConfig.VODKA_STYLES,
+            "gin": ScraperConfig.GIN_STYLES,
+            "rum": ScraperConfig.RUM_STYLES,
+            "vodka": ScraperConfig.VODKA_STYLES,
         }
         queries = []
         if use_styles and category in style_map:
@@ -280,7 +338,9 @@ class DistillerScraperV2:
                 )
                 queries.append((url, style_name))
         else:
-            url = f"https://distiller.com/search?category={category}&sort=distiller_score"
+            url = (
+                f"https://distiller.com/search?category={category}&sort=distiller_score"
+            )
             queries.append((url, category))
         return queries
 
@@ -404,13 +464,43 @@ class DistillerScraperV2:
                 if len(results) >= max_spirits:
                     break
 
-                logger.info(f"  第 {page} 頁 ({'API' if self.api_client and self.api_client.is_available() else 'Selenium'})")
+                logger.info(
+                    f"  第 {page} 頁 ({'API' if self.api_client and self.api_client.is_available() else 'Selenium'})"
+                )
 
-                try:
-                    urls_on_page = self._fetch_spirit_urls(base_url, page)
-                except Exception as e:
-                    logger.error(f"  載入第 {page} 頁失敗: {e}")
-                    self.page_errors += 1
+                urls_on_page: List[str] = []
+                page_loaded = False
+                for attempt in range(ScraperConfig.PAGE_RETRY_COUNT):
+                    if self.driver_failed:
+                        break
+                    try:
+                        urls_on_page = self._fetch_spirit_urls(base_url, page)
+                        page_loaded = True
+                        break
+                    except Exception as e:
+                        if attempt < ScraperConfig.PAGE_RETRY_COUNT - 1:
+                            logger.warning(
+                                f"  第 {page} 頁嘗試 {attempt + 1} 失敗，重試..."
+                            )
+                            continue
+                        if (
+                            self._should_restart(str(e))
+                            and self.restart_count < ScraperConfig.MAX_RESTART_ATTEMPTS
+                        ):
+                            self.restart_driver()
+                            if self.driver_failed:
+                                break
+                            try:
+                                urls_on_page = self._fetch_spirit_urls(base_url, page)
+                                page_loaded = True
+                                break
+                            except Exception as retry_error:
+                                logger.error(f"  載入第 {page} 頁失敗: {retry_error}")
+                                self.page_errors += 1
+                                break
+                        logger.error(f"  載入第 {page} 頁失敗: {e}")
+                        self.page_errors += 1
+                if not page_loaded:
                     break
 
                 if not urls_on_page:
@@ -440,8 +530,12 @@ class DistillerScraperV2:
                         else:
                             logger.info("  分頁無效（第二頁無新內容），切換至滾動模式")
                             try:
-                                first_page_urls = self._fetch_spirit_urls_from_page(base_url)
-                                self._scrape_urls(first_page_urls, category, results, max_spirits)
+                                first_page_urls = self._fetch_spirit_urls_from_page(
+                                    base_url
+                                )
+                                self._scrape_urls(
+                                    first_page_urls, category, results, max_spirits
+                                )
                             except Exception as e:
                                 logger.warning(f"  滾動模式 fallback 失敗: {e}")
                                 self.page_errors += 1
@@ -467,7 +561,11 @@ class DistillerScraperV2:
                     self._scrape_urls(urls_on_page, category, results, max_spirits)
 
                 # 重複率過高也停止（僅在有部分新 URL 時判斷）
-                if page >= 2 and new_urls and duplicate_ratio >= ScraperConfig.DUPLICATE_RATIO_THRESHOLD:
+                if (
+                    page >= 2
+                    and new_urls
+                    and duplicate_ratio >= ScraperConfig.DUPLICATE_RATIO_THRESHOLD
+                ):
                     logger.info(f"  重複率 {duplicate_ratio:.0%} 過高，停止分頁")
                     break
 
@@ -533,14 +631,24 @@ class DistillerScraperV2:
         except Exception as e:
             error_msg = str(e)
             # 檢查是否為 session 斷開錯誤
-            if "invalid session id" in error_msg or "session deleted" in error_msg:
-                if retry_count < max_retries:
+            if self._should_restart(error_msg):
+                if (
+                    self.restart_count < ScraperConfig.MAX_RESTART_ATTEMPTS
+                    and retry_count < max_retries
+                ):
                     logger.warning(
                         f"Session 斷開，嘗試重新連接 (第 {retry_count + 1} 次)..."
                     )
-                    if self.restart_driver():
-                        time.sleep(2)
-                        return self.scrape_spirit_detail(url, retry_count + 1)
+                    try:
+                        if self.restart_driver():
+                            self.restart_count += 1
+                            time.sleep(2)
+                            return self.scrape_spirit_detail(url, retry_count + 1)
+                    except Exception as restart_exc:
+                        logger.error(f"重啟 driver 失敗: {restart_exc}")
+                        self.driver_failed = True
+                else:
+                    self.driver_failed = True
                 logger.error(f"重試 {max_retries} 次後仍失敗: {url}")
             else:
                 logger.error(f"爬取錯誤 {url}: {e}")
@@ -583,14 +691,19 @@ class DistillerScraperV2:
                 self._scrape_urls(urls, category, results, max_spirits)
             except Exception as e:
                 error_msg = str(e)
-                if "invalid session id" in error_msg or "session deleted" in error_msg:
-                    logger.warning("Session 斷開，嘗試重新連接...")
-                    if self.restart_driver():
-                        time.sleep(2)
-                        continue
-                logger.error(f"爬取 {label} 時發生錯誤: {e}")
-                self.page_errors += 1
-                continue
+                if self._should_restart(error_msg):
+                    if self.restart_count < ScraperConfig.MAX_RESTART_ATTEMPTS:
+                        logger.warning("Session 斷開，嘗試重新連接...")
+                        try:
+                            if self.restart_driver():
+                                self.restart_count += 1
+                                time.sleep(2)
+                                continue
+                        except Exception as restart_exc:
+                            logger.error(f"重啟 driver 失敗: {restart_exc}")
+                            self.driver_failed = True
+                    else:
+                        self.driver_failed = True
 
             if len(queries) > 1:
                 time.sleep(ScraperConfig.CATEGORY_DELAY)
@@ -622,6 +735,10 @@ class DistillerScraperV2:
         if not self.start_driver():
             return False
 
+        if not self._health_check():
+            logger.error("Health check failed — aborting scrape")
+            return False
+
         # API 端點探測（若 api_client 已設定）
         if self.api_client:
             self.discover_api(warm_up_category=categories[0])
@@ -632,7 +749,7 @@ class DistillerScraperV2:
                     logger.info(f"\n{'=' * 60}")
                     logger.info(f"類別 {cat_idx}/{len(categories)}: {category}")
                     logger.info(f"{'=' * 60}\n")
-                    
+
                     category_results = self.scrape_category(
                         category,
                         max_spirits=max_per_category,
@@ -640,19 +757,21 @@ class DistillerScraperV2:
                         use_pagination=use_pagination,
                     )
                     self.spirits_data.extend(category_results)
-                    
+
                     logger.info(f"類別 {category} 完成: {len(category_results)} 筆")
-                    
+
                     if cat_idx < len(categories):
-                        logger.info(f"等待 {ScraperConfig.CATEGORY_DELAY} 秒後繼續...\n")
+                        logger.info(
+                            f"等待 {ScraperConfig.CATEGORY_DELAY} 秒後繼續...\n"
+                        )
                         time.sleep(ScraperConfig.CATEGORY_DELAY)
                 except Exception as e:
                     logger.error(f"類別 {category} 爬取失敗: {e}")
                     continue
-            
+
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            
+
             logger.info(f"\n{'=' * 80}")
             logger.info(f"爬取完成！")
             logger.info(f"總筆數: {len(self.spirits_data)}")
@@ -660,13 +779,13 @@ class DistillerScraperV2:
             logger.info(f"頁面載入失敗數: {self.page_errors}")
             logger.info(f"耗時: {duration / 60:.1f} 分鐘")
             logger.info(f"{'=' * 80}\n")
-            
+
             return True
-        
+
         except Exception as e:
             logger.error(f"爬蟲執行時發生錯誤: {e}")
             return False
-        
+
         finally:
             self.close_driver()
 
@@ -705,7 +824,11 @@ class DistillerScraperV2:
     def get_statistics(self) -> Dict:
         """獲取統計資訊"""
         if not self.spirits_data:
-            return {"總記錄數": 0, "失敗 URL 數": len(self.failed_urls), "頁面載入失敗數": self.page_errors}
+            return {
+                "總記錄數": 0,
+                "失敗 URL 數": len(self.failed_urls),
+                "頁面載入失敗數": self.page_errors,
+            }
 
         df = self.to_dataframe()
 
