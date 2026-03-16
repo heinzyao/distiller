@@ -229,3 +229,38 @@ class TestNotifyFailure:
             notifier.notify_failure("test")
         msg = mock_send.call_args[0][0]
         assert "未知錯誤" in msg
+
+    def test_page_errors_in_message(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_failure("full", "Some error", page_errors=5)
+        msg = mock_send.call_args[0][0]
+        assert "5" in msg
+
+    def test_error_details_in_message(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_failure("full", "Some error", error_details="url1 url2 url3")
+        msg = mock_send.call_args[0][0]
+        assert "url1 url2 url3" in msg
+
+    def test_zero_page_errors_and_empty_details_backward_compat(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            result_new = notifier.notify_failure("full", "Driver crashed", page_errors=0, error_details="")
+        msg_new = mock_send.call_args[0][0]
+        with patch.object(notifier, "send", return_value=True) as mock_send2:
+            notifier.notify_failure("full", "Driver crashed")
+        msg_old = mock_send2.call_args[0][0]
+        assert result_new is True
+        assert msg_new == msg_old
+
+    def test_line_api_failure_returns_false_only(self, notifier):
+        with patch.object(notifier, "send", return_value=False) as mock_send:
+            result = notifier.notify_failure("full", "Driver crashed", page_errors=3, error_details="url1")
+        assert result is False
+        mock_send.assert_called_once()
+
+    def test_page_errors_and_error_details_combined(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_failure("full", "Timeout", page_errors=7, error_details="/whiskey /gin")
+        msg = mock_send.call_args[0][0]
+        assert "7" in msg
+        assert "/whiskey /gin" in msg

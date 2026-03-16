@@ -127,7 +127,7 @@ class LineNotifier:
         text = "\n".join(lines)
         return self.send(text)
 
-    def notify_failure(self, mode: str, error: str = "") -> bool:
+    def notify_failure(self, mode: str, error: str = "", page_errors: int = 0, error_details: str = "") -> bool:
         """格式化並發送爬取失敗通知。"""
         lines = [
             "❌ Distiller 爬蟲執行失敗",
@@ -137,4 +137,11 @@ class LineNotifier:
             f"  模式　{mode}",
             f"  錯誤　{error or '未知錯誤，請查看日誌。'}",
         ]
+        if page_errors > 0:
+            lines.append(f"  頁面錯誤數　{page_errors}")
+        if error_details:
+            lines.append("")
+            lines.append("📋 錯誤詳情")
+            lines.append(_SEP_LIGHT)
+            lines.append(error_details)
         return self.send("\n".join(lines))
