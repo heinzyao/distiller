@@ -51,6 +51,9 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 import pandas as pd
 from selenium.common.exceptions import JavascriptException, TimeoutException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 
 from .api_client import DistillerAPIClient
@@ -266,6 +269,12 @@ class DistillerScraperV2:
         try:
             self.driver.set_page_load_timeout(ScraperConfig.HEALTH_CHECK_TIMEOUT)
             self.driver.get(url)
+            time.sleep(ScraperConfig.INITIAL_PAGE_DELAY)
+            # 等待 <body> 元素存在，防止 "document.body is null" 錯誤
+            # 原因：頁面可能因 React 非同步水合尚未完成，導致 DOM 未就緒
+            WebDriverWait(self.driver, ScraperConfig.HEALTH_CHECK_TIMEOUT).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
             self.driver.execute_script("return document.body.scrollHeight")
             return True
         except TimeoutException as e:
