@@ -85,7 +85,7 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
     storage, csv_file = _build_storage(output, db_path, str(DATA_DIR / "distiller_test_v2.csv"))
     if _should_skip_run(storage):
         print("⏭️  Recent successful run found, skipping")
-        return True, {}
+        return True, {"_skipped": True}
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
     run_id = None
@@ -133,7 +133,7 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
     )
     if _should_skip_run(storage):
         print("⏭️  Recent successful run found, skipping")
-        return True, {}
+        return True, {"_skipped": True}
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
     _medium_categories = ["whiskey", "gin", "rum", "vodka"]
@@ -182,7 +182,7 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
     )
     if _should_skip_run(storage):
         print("⏭️  Recent successful run found, skipping")
-        return True, {}
+        return True, {"_skipped": True}
     scraper = DistillerScraperV2(headless=True, storage=storage, api_client=_build_api_client(args))
 
     _full_categories = [
@@ -277,18 +277,27 @@ def main():
 
     # LINE 通知（失敗時自動等待 30 秒重試一次，處理 3AM 暫時性 DNS 問題）
     if args.notify_line:
+        skipped = stats.get("_skipped", False)
         notifier = LineNotifier()
         if not notifier.is_configured():
             print("⚠️  LINE 通知未設定（缺少 LINE_CHANNEL_ID、LINE_CHANNEL_SECRET 或 LINE_USER_ID）")
         else:
-            send_fn = notifier.notify_success if success else notifier.notify_failure
-            send_args = (args.mode, stats) if success else (args.mode,)
+            if success:
+                send_fn = notifier.notify_success
+                clean_stats = {k: v for k, v in stats.items() if not k.startswith("_")}
+                send_args = (args.mode, clean_stats)
+            else:
+                send_fn = notifier.notify_failure
+                send_args = (args.mode,)
             ok = send_fn(*send_args)
             if not ok:
                 print("⚠️  LINE 通知第一次失敗，30 秒後重試…")
                 time.sleep(30)
                 ok = send_fn(*send_args)
-            label = "LINE 通知已發送" if success else "LINE 失敗通知已發送"
+            if success:
+                label = "LINE 跳過通知已發送" if skipped else "LINE 通知已發送"
+            else:
+                label = "LINE 失敗通知已發送"
             print(f"📱 {label}" if ok else "⚠️  LINE 通知發送失敗（請查看日誌）")
 
     if success:
