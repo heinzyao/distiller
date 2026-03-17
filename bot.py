@@ -58,7 +58,7 @@ DB_DEFAULT = "distiller.db"
 MSG_LIMIT = 4900  # LINE 單則訊息字元上限（官方上限 5000，保留 100 字元緩衝）
 
 # 視覺元素：統一的分隔線與獎牌圖示，讓 LINE 訊息格式一致且易讀
-_SEP = "━" * 16        # 主要分隔線（粗）
+_SEP = "━" * 16  # 主要分隔線（粗）
 _SEP_LIGHT = "─" * 16  # 次要分隔線（細）
 _MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}  # Top 3 排行獎牌
 
@@ -156,10 +156,14 @@ def _start_scraper_thread(mode: str, db_path: str) -> None:
     """在背景執行緒中啟動爬蟲，完成後由 run.py --notify-line 自動推播通知。"""
     run_py = str(Path(__file__).parent / "run.py")
     cmd = [
-        sys.executable, run_py,
-        "--mode", mode,
-        "--output", "sqlite",
-        "--db-path", db_path,
+        sys.executable,
+        run_py,
+        "--mode",
+        mode,
+        "--output",
+        "sqlite",
+        "--db-path",
+        db_path,
         "--notify-line",
     ]
 
@@ -198,7 +202,9 @@ def _score_bar(score: int | None, width: int = 8) -> str:
 
 
 def _fmt_score(score_value: int | float | None) -> str:
-    bar = _score_bar(int(score_value) if isinstance(score_value, (int, float)) else None)
+    bar = _score_bar(
+        int(score_value) if isinstance(score_value, (int, float)) else None
+    )
     return f"{bar} {score_value}分" if score_value else "無評分"
 
 
@@ -461,38 +467,48 @@ def fmt_run_status() -> str:
         mode = _scrape_state.get("mode")
         started_at = _scrape_state.get("started_at")
     if running:
-        return f"🔄 爬蟲執行中\n模式：{mode}\n開始時間：{started_at}"
+        elapsed_str = "—"
+        if started_at:
+            try:
+                elapsed = datetime.now() - datetime.fromisoformat(started_at)
+                m, s = divmod(int(elapsed.total_seconds()), 60)
+                elapsed_str = f"{m} 分 {s} 秒"
+            except (ValueError, TypeError):
+                pass
+        return f"🔄 爬蟲執行中\n模式：{mode}\n開始時間：{started_at}\n已執行：{elapsed_str}"
     return "💤 目前無爬蟲執行中"
 
 
 def fmt_help() -> str:
-    return "\n".join([
-        "🥃 Distiller 查詢指令",
-        _SEP,
-        "",
-        "🔎 搜尋與瀏覽",
-        "top [N]",
-        "  評分最高前 N 筆（預設 10）",
-        "搜尋 <關鍵字>",
-        "  搜尋品名、品牌、描述",
-        "詳情 <名稱>",
-        "  完整資訊與風味圖譜",
-        "列表 [產地] [分數]",
-        "  例：列表 Japan｜列表 Scotland 95",
-        "",
-        "📊 統計與風味",
-        "統計  資料庫統計摘要",
-        "風味 [名稱]  維度排行",
-        "  例：風味 smoky",
-        "",
-        "",
-        "🤖 爬蟲指令（僅授權使用者）",
-        "執行 test / medium / full",
-        "  啟動爬蟲（完成後推播通知）",
-        "執行狀態",
-        "  查看目前執行狀態",
-        "❓ 說明  顯示本說明",
-    ])
+    return "\n".join(
+        [
+            "🥃 Distiller 查詢指令",
+            _SEP,
+            "",
+            "🔎 搜尋與瀏覽",
+            "top [N]",
+            "  評分最高前 N 筆（預設 10）",
+            "搜尋 <關鍵字>",
+            "  搜尋品名、品牌、描述",
+            "詳情 <名稱>",
+            "  完整資訊與風味圖譜",
+            "列表 [產地] [分數]",
+            "  例：列表 Japan｜列表 Scotland 95",
+            "",
+            "📊 統計與風味",
+            "統計  資料庫統計摘要",
+            "風味 [名稱]  維度排行",
+            "  例：風味 smoky",
+            "",
+            "",
+            "🤖 爬蟲指令（僅授權使用者）",
+            "執行 test / medium / full",
+            "  啟動爬蟲（完成後推播通知）",
+            "執行狀態",
+            "  查看目前執行狀態",
+            "❓ 說明  顯示本說明",
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------

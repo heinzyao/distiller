@@ -14,6 +14,8 @@ import logging
 import os
 from datetime import datetime
 
+from distiller_scraper.config import ScraperConfig
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,17 @@ _SEP = "━" * 16
 _SEP_LIGHT = "─" * 16
 
 
+def _fmt_duration(secs: int) -> str:
+    if secs < 60:
+        return f"{secs} 秒"
+    if secs < 3600:
+        m, s = divmod(secs, 60)
+        return f"{m} 分 {s} 秒"
+    h, rem = divmod(secs, 3600)
+    m = rem // 60
+    return f"{h} 小時 {m} 分"
+
+
 class LineNotifier:
     """透過 LINE Messaging API 發送推播通知。"""
 
@@ -34,8 +47,14 @@ class LineNotifier:
         channel_secret: str | None = None,
         user_id: str | None = None,
     ):
-        self.channel_id = channel_id if channel_id is not None else os.getenv("LINE_CHANNEL_ID", "")
-        self.channel_secret = channel_secret if channel_secret is not None else os.getenv("LINE_CHANNEL_SECRET", "")
+        self.channel_id = (
+            channel_id if channel_id is not None else os.getenv("LINE_CHANNEL_ID", "")
+        )
+        self.channel_secret = (
+            channel_secret
+            if channel_secret is not None
+            else os.getenv("LINE_CHANNEL_SECRET", "")
+        )
         self.user_id = user_id if user_id is not None else os.getenv("LINE_USER_ID", "")
 
     def _timestamp(self) -> str:
@@ -58,7 +77,9 @@ class LineNotifier:
                 timeout=15,
             )
             if resp.status_code != 200:
-                logger.warning("LINE Token 取得失敗：%s %s", resp.status_code, resp.text)
+                logger.warning(
+                    "LINE Token 取得失敗：%s %s", resp.status_code, resp.text
+                )
                 return None
             return resp.json()["access_token"]
         except requests.RequestException as exc:
@@ -95,8 +116,9 @@ class LineNotifier:
             logger.error("LINE 通知發送失敗：%s", exc)
             return False
 
-    def notify_success(self, mode: str, stats: dict) -> bool:
-        """格式化並發送爬取成功通知。"""
+    def notify_success(
+        self, mode: str, stats: dict, duration_secs: int = 0, page_errors: int = 0
+    ) -> bool:
         total = stats.get("總記錄數", stats.get("total_records", "?"))
         failed = stats.get("失敗 URL 數", stats.get("failed_urls", "?"))
         categories = stats.get("類別分布", stats.get("category_distribution", {}))
@@ -104,13 +126,25 @@ class LineNotifier:
             "✅ Distiller 爬蟲執行完成",
             _SEP,
             f"⏰ {self._timestamp()}",
-            "",
-            f"  模式　　{mode}",
-            f"  總筆數　{total}",
-            f"  失敗數　{failed}",
         ]
+        if duration_secs > 0:
+            lines.append(f"⏱ 耗時 {_fmt_duration(duration_secs)}")
+        lines.extend(
+            [
+                "",
+                f"  模式　　{mode}",
+                f"  總筆數　{total}",
+                f"  失敗數　{failed}",
+            ]
+        )
+        if page_errors > 0:
+            lines.append(f"  頁面錯誤　{page_errors}")
         if categories:
-            cat_total = sum(categories.values()) if all(isinstance(v, (int, float)) for v in categories.values()) else 0
+            cat_total = (
+                sum(categories.values())
+                if all(isinstance(v, (int, float)) for v in categories.values())
+                else 0
+            )
             lines.append("")
             lines.append("📋 類別分布")
             lines.append(_SEP_LIGHT)
@@ -127,16 +161,28 @@ class LineNotifier:
         text = "\n".join(lines)
         return self.send(text)
 
-    def notify_failure(self, mode: str, error: str = "", page_errors: int = 0, error_details: str = "") -> bool:
-        """格式化並發送爬取失敗通知。"""
-        lines = [
+    def notify_failure(
+        self,
+        mode: str,
+        error: str = "",
+        page_errors: int = 0,
+        error_details: str = "",
+        duration_secs: int = 0,
+    ) -> bool:
+        lines: list[str] = [
             "❌ Distiller 爬蟲執行失敗",
             _SEP,
             f"⏰ {self._timestamp()}",
-            "",
-            f"  模式　{mode}",
-            f"  錯誤　{error or '未知錯誤，請查看日誌。'}",
         ]
+        if duration_secs > 0:
+            lines.append(f"⏱ 耗時 {_fmt_duration(duration_secs)}")
+        lines.extend(
+            [
+                "",
+                f"  模式　{mode}",
+                f"  錯誤　{error or '未知錯誤，請查看日誌。'}",
+            ]
+        )
         if page_errors > 0:
             lines.append(f"  頁面錯誤數　{page_errors}")
         if error_details:
@@ -144,4 +190,21 @@ class LineNotifier:
             lines.append("📋 錯誤詳情")
             lines.append(_SEP_LIGHT)
             lines.append(error_details)
+        return self.send("\n".join(lines))
+
+    def notify_skipped(self, mode: str, last_run_at: str = "") -> bool:
+        lines: list[str] = [
+            "⏭️ Distiller 爬蟲已跳過",
+            _SEP,
+            f"⏰ {self._timestamp()}",
+            "",
+            f"  模式　　{mode}",
+            f"  原因　　{ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS} 小時內已有成功執行紀錄",
+        ]
+        if last_run_at:
+            try:
+                ts = datetime.fromisoformat(last_run_at).strftime("%Y-%m-%d %H:%M")
+            except (ValueError, TypeError):
+                ts = last_run_at
+            lines.append(f"  上次執行　{ts}")
         return self.send("\n".join(lines))

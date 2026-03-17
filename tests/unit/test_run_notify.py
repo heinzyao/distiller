@@ -29,10 +29,11 @@ def _make_notifier_mock(is_configured=True, send_results=None):
     if send_results is None:
         send_results = [True]
 
-    # notify_success / notify_failure 底層都呼叫 send()；
+    # notify_success / notify_failure / notify_skipped 底層都呼叫 send()；
     # 這裡直接設定高階方法的回傳值序列。
     mock.notify_success.side_effect = send_results
     mock.notify_failure.side_effect = send_results
+    mock.notify_skipped.side_effect = send_results
     return mock
 
 
@@ -78,10 +79,8 @@ def _run_main(monkeypatch, extra_argv=None, run_fn_return=None):
 class TestMainNotify:
     """main() 在 --notify-line 下的各情境測試。"""
 
-    def test_skip_scenario_calls_notify_success_with_empty_stats(
-        self, monkeypatch, capsys
-    ):
-        """跳過情境：_skipped=True，應呼叫 notify_success 且 stats 不含 _skipped 鍵。"""
+    def test_skip_scenario_calls_notify_skipped(self, monkeypatch, capsys):
+        """跳過情境：_skipped=True，應呼叫 notify_skipped，不應呼叫 notify_success。"""
         mock_notifier = _make_notifier_mock(is_configured=True, send_results=[True])
 
         import run as run_module
@@ -92,20 +91,22 @@ class TestMainNotify:
 
         with (
             patch.object(
-                run_module, "run_test", return_value=(True, {"_skipped": True})
+                run_module,
+                "run_test",
+                return_value=(
+                    True,
+                    {"_skipped": True, "_last_run_at": "2026-03-16T03:00:00"},
+                ),
             ),
             patch.object(run_module, "LineNotifier", return_value=mock_notifier),
             patch.object(run_module.time, "sleep"),
         ):
             run_module.main()
 
-        mock_notifier.notify_success.assert_called_once()
-        call_args = mock_notifier.notify_success.call_args
-        mode_arg = call_args[0][0]
-        stats_arg = call_args[0][1]
-        assert mode_arg == "test"
-        # _skipped 必須被過濾掉
-        assert "_skipped" not in stats_arg
+        mock_notifier.notify_skipped.assert_called_once()
+        mock_notifier.notify_success.assert_not_called()
+        call_args = mock_notifier.notify_skipped.call_args
+        assert call_args[0][0] == "test"
 
     def test_skip_scenario_label_contains_skip_text(self, monkeypatch, capsys):
         """跳過情境成功發送後，印出文字應包含「跳過」字樣。"""
@@ -119,7 +120,9 @@ class TestMainNotify:
 
         with (
             patch.object(
-                run_module, "run_test", return_value=(True, {"_skipped": True})
+                run_module,
+                "run_test",
+                return_value=(True, {"_skipped": True, "_last_run_at": ""}),
             ),
             patch.object(run_module, "LineNotifier", return_value=mock_notifier),
             patch.object(run_module.time, "sleep"),
@@ -147,7 +150,10 @@ class TestMainNotify:
         ):
             run_module.main()
 
-        mock_notifier.notify_success.assert_called_once_with("test", stats)
+        mock_notifier.notify_success.assert_called_once()
+        call_args = mock_notifier.notify_success.call_args
+        assert call_args[0][0] == "test"
+        assert call_args[0][1] == stats
         mock_notifier.notify_failure.assert_not_called()
 
     def test_scrape_failure_calls_notify_failure(self, monkeypatch, capsys):
@@ -170,7 +176,8 @@ class TestMainNotify:
             except SystemExit:
                 pass
 
-        mock_notifier.notify_failure.assert_called_once_with("test")
+        mock_notifier.notify_failure.assert_called_once()
+        assert mock_notifier.notify_failure.call_args[0][0] == "test"
         mock_notifier.notify_success.assert_not_called()
 
     def test_health_check_failure_calls_notify_failure(self, monkeypatch, capsys):
@@ -333,9 +340,9 @@ class TestMainNotify:
         assert exit_called == []
 
     def test_skipped_stats_filtered_before_notify(self, monkeypatch):
-        """stats 含有其他真實欄位時，_skipped 應被過濾，其他欄位保留。"""
+        """stats 含有其他真實欄位時，_skipped 路徑呼叫 notify_skipped，not notify_success。"""
         mock_notifier = _make_notifier_mock(is_configured=True, send_results=[True])
-        stats = {"總記錄數": 10, "_skipped": True}
+        stats = {"總記錄數": 10, "_skipped": True, "_last_run_at": ""}
 
         import run as run_module
 
@@ -350,7 +357,5 @@ class TestMainNotify:
         ):
             run_module.main()
 
-        call_args = mock_notifier.notify_success.call_args[0]
-        sent_stats = call_args[1]
-        assert "_skipped" not in sent_stats
-        assert sent_stats.get("總記錄數") == 10
+        mock_notifier.notify_skipped.assert_called_once()
+        mock_notifier.notify_success.assert_not_called()

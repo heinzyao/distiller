@@ -40,6 +40,7 @@ from bot import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def db_path(tmp_path):
     db = tmp_path / "test.db"
@@ -86,17 +87,73 @@ def db_path(tmp_path):
     conn.executemany(
         "INSERT INTO spirits (name, spirit_type, brand, country, expert_score, community_score, abv, cost_level, review_count, tasting_notes, url) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         [
-            ("Highland Park 18 Year", "Single Malt", "Highland Park", "Scotland", 99, 4.47, 43.0, 3, 3078, "Honey and smoke.", "https://distiller.com/spirits/hp18"),
-            ("Hibiki 21 Year",        "Blended",     "Suntory",       "Japan",    99, 4.52, 43.0, 4, 900,  "Floral and silky.", "https://distiller.com/spirits/hibiki21"),
-            ("Lagavulin 16 Year",     "Single Malt", "Lagavulin",     "Scotland", 96, 4.35, 43.0, 3, 2500, "Smoke and ash.",    "https://distiller.com/spirits/lag16"),
-            ("Tito's Vodka",          "Unflavored Vodka", "Tito's",   "USA",      78, 3.5,  40.0, 1, 500,  "Clean.",            "https://distiller.com/spirits/titos"),
+            (
+                "Highland Park 18 Year",
+                "Single Malt",
+                "Highland Park",
+                "Scotland",
+                99,
+                4.47,
+                43.0,
+                3,
+                3078,
+                "Honey and smoke.",
+                "https://distiller.com/spirits/hp18",
+            ),
+            (
+                "Hibiki 21 Year",
+                "Blended",
+                "Suntory",
+                "Japan",
+                99,
+                4.52,
+                43.0,
+                4,
+                900,
+                "Floral and silky.",
+                "https://distiller.com/spirits/hibiki21",
+            ),
+            (
+                "Lagavulin 16 Year",
+                "Single Malt",
+                "Lagavulin",
+                "Scotland",
+                96,
+                4.35,
+                43.0,
+                3,
+                2500,
+                "Smoke and ash.",
+                "https://distiller.com/spirits/lag16",
+            ),
+            (
+                "Tito's Vodka",
+                "Unflavored Vodka",
+                "Tito's",
+                "USA",
+                78,
+                3.5,
+                40.0,
+                1,
+                500,
+                "Clean.",
+                "https://distiller.com/spirits/titos",
+            ),
         ],
     )
     conn.executemany(
         "INSERT INTO flavor_profiles (spirit_id, flavor_name, flavor_value) VALUES (?,?,?)",
-        [(1, "smoky", 40), (1, "sweet", 70), (2, "floral", 60), (3, "smoky", 90), (3, "peaty", 80)],
+        [
+            (1, "smoky", 40),
+            (1, "sweet", 70),
+            (2, "floral", 60),
+            (3, "smoky", 90),
+            (3, "peaty", 80),
+        ],
     )
-    conn.execute("INSERT INTO scrape_runs (started_at, total_scraped, total_failed) VALUES ('2026-02-28', 4, 0)")
+    conn.execute(
+        "INSERT INTO scrape_runs (started_at, total_scraped, total_failed) VALUES ('2026-02-28', 4, 0)"
+    )
     conn.commit()
     conn.close()
     return str(db)
@@ -104,7 +161,9 @@ def db_path(tmp_path):
 
 @pytest.fixture
 def app(db_path):
-    return create_app(db_path=db_path, channel_secret="test-secret", channel_id="test-id")
+    return create_app(
+        db_path=db_path, channel_secret="test-secret", channel_id="test-id"
+    )
 
 
 @pytest.fixture
@@ -117,51 +176,77 @@ def _make_signature(body: bytes, secret: str) -> str:
     return base64.b64encode(digest).decode()
 
 
-def _webhook_payload(text: str, reply_token: str = "test-reply-token", user_id: str = "") -> dict:
+def _webhook_payload(
+    text: str, reply_token: str = "test-reply-token", user_id: str = ""
+) -> dict:
     return {
-        "events": [{
-            "type": "message",
-            "replyToken": reply_token,
-            "source": {"userId": user_id},
-            "message": {"type": "text", "text": text},
-        }]
+        "events": [
+            {
+                "type": "message",
+                "replyToken": reply_token,
+                "source": {"userId": user_id},
+                "message": {"type": "text", "text": text},
+            }
+        ]
     }
+
 
 # ---------------------------------------------------------------------------
 # 指令解析
 # ---------------------------------------------------------------------------
 
+
 class TestParseCommand:
-    def test_help_zh(self):      assert parse_command("說明") == ("help", [])
-    def test_help_en(self):      assert parse_command("help") == ("help", [])
-    def test_help_question(self):assert parse_command("?") == ("help", [])
-    def test_stats_zh(self):     assert parse_command("統計") == ("stats", [])
-    def test_stats_en(self):     assert parse_command("stats") == ("stats", [])
-    def test_flavors_all(self):  assert parse_command("風味") == ("flavors", [])
+    def test_help_zh(self):
+        assert parse_command("說明") == ("help", [])
+
+    def test_help_en(self):
+        assert parse_command("help") == ("help", [])
+
+    def test_help_question(self):
+        assert parse_command("?") == ("help", [])
+
+    def test_stats_zh(self):
+        assert parse_command("統計") == ("stats", [])
+
+    def test_stats_en(self):
+        assert parse_command("stats") == ("stats", [])
+
+    def test_flavors_all(self):
+        assert parse_command("風味") == ("flavors", [])
+
     def test_flavors_name(self):
         cmd, args = parse_command("風味 smoky")
         assert cmd == "flavors" and args == ["smoky"]
+
     def test_top_default(self):
         cmd, args = parse_command("top")
         assert cmd == "top" and args == [10]
+
     def test_top_n(self):
         cmd, args = parse_command("top 5")
         assert cmd == "top" and args == [5]
+
     def test_top_capped(self):
         _, args = parse_command("top 99")
         assert args[0] == 20
+
     def test_search_zh(self):
         cmd, args = parse_command("搜尋 Lagavulin")
         assert cmd == "search" and args == ["Lagavulin"]
+
     def test_info_zh(self):
         cmd, args = parse_command("詳情 Highland Park")
         assert cmd == "info" and args == ["Highland Park"]
+
     def test_list_plain(self):
         cmd, args = parse_command("列表")
         assert cmd == "list" and args == [None, None]
+
     def test_list_country(self):
         cmd, args = parse_command("列表 Japan")
         assert cmd == "list" and args[0] == "Japan"
+
     def test_unknown(self):
         cmd, _ = parse_command("隨便說點什麼")
         assert cmd == "unknown"
@@ -186,6 +271,7 @@ class TestParseCommand:
 # ---------------------------------------------------------------------------
 # 格式化函式
 # ---------------------------------------------------------------------------
+
 
 class TestFmtTop:
     def test_contains_names(self, db_path):
@@ -274,6 +360,7 @@ class TestFmtHelp:
 # _handle 整合
 # ---------------------------------------------------------------------------
 
+
 class TestHandle:
     def test_missing_db(self, tmp_path):
         result = _handle("統計", str(tmp_path / "no.db"))
@@ -296,6 +383,7 @@ class TestHandle:
 # LINE 簽名驗證
 # ---------------------------------------------------------------------------
 
+
 class TestVerifySignature:
     def test_valid(self):
         body = b"hello"
@@ -315,6 +403,7 @@ class TestVerifySignature:
 # Flask Webhook
 # ---------------------------------------------------------------------------
 
+
 class TestWebhook:
     def test_invalid_signature_returns_400(self, client):
         payload = json.dumps(_webhook_payload("統計")).encode()
@@ -328,8 +417,10 @@ class TestWebhook:
     def test_valid_request_returns_200(self, client):
         payload = json.dumps(_webhook_payload("統計")).encode()
         sig = _make_signature(payload, "test-secret")
-        with patch("bot._get_access_token", return_value="mock-token"), \
-             patch("bot._reply") as mock_reply:
+        with (
+            patch("bot._get_access_token", return_value="mock-token"),
+            patch("bot._reply") as mock_reply,
+        ):
             resp = client.post(
                 "/webhook",
                 data=payload,
@@ -339,14 +430,21 @@ class TestWebhook:
         mock_reply.assert_called_once()
 
     def test_reply_contains_query_result(self, client, db_path):
-        app = create_app(db_path=db_path, channel_secret="test-secret", channel_id="test-id")
+        app = create_app(
+            db_path=db_path, channel_secret="test-secret", channel_id="test-id"
+        )
         c = app.test_client()
         payload = json.dumps(_webhook_payload("搜尋 Hibiki")).encode()
         sig = _make_signature(payload, "test-secret")
-        with patch("bot._get_access_token", return_value="tok"), \
-             patch("bot._reply") as mock_reply:
-            c.post("/webhook", data=payload,
-                   headers={"Content-Type": "application/json", "X-Line-Signature": sig})
+        with (
+            patch("bot._get_access_token", return_value="tok"),
+            patch("bot._reply") as mock_reply,
+        ):
+            c.post(
+                "/webhook",
+                data=payload,
+                headers={"Content-Type": "application/json", "X-Line-Signature": sig},
+            )
         replied_text = mock_reply.call_args[0][1]
         assert "Hibiki" in replied_text
 
@@ -365,10 +463,15 @@ class TestWebhook:
     def test_no_token_no_reply(self, client):
         payload = json.dumps(_webhook_payload("統計")).encode()
         sig = _make_signature(payload, "test-secret")
-        with patch("bot._get_access_token", return_value=None), \
-             patch("bot._reply") as mock_reply:
-            client.post("/webhook", data=payload,
-                        headers={"Content-Type": "application/json", "X-Line-Signature": sig})
+        with (
+            patch("bot._get_access_token", return_value=None),
+            patch("bot._reply") as mock_reply,
+        ):
+            client.post(
+                "/webhook",
+                data=payload,
+                headers={"Content-Type": "application/json", "X-Line-Signature": sig},
+            )
         mock_reply.assert_not_called()
 
 
@@ -392,6 +495,7 @@ class TestTokenCache:
 
     def test_expired_token_refetches(self):
         import bot
+
         bot._token_cache["token"] = "old"
         bot._token_cache["expires_at"] = time.time() - 100
         with patch("bot._get_access_token", return_value="new-tok") as mock_fetch:
@@ -401,6 +505,7 @@ class TestTokenCache:
 
     def test_soon_to_expire_refetches(self):
         import bot
+
         bot._token_cache["token"] = "old"
         bot._token_cache["expires_at"] = time.time() + 30  # inside 60s safety margin
         with patch("bot._get_access_token", return_value="new-tok") as mock_fetch:
@@ -410,6 +515,7 @@ class TestTokenCache:
 
     def test_failed_fetch_returns_none(self):
         import bot
+
         with patch("bot._get_access_token", return_value=None):
             result = _get_cached_token("id", "sec")
         assert result is None
@@ -417,6 +523,7 @@ class TestTokenCache:
 
     def test_cache_populated_on_success(self):
         import bot
+
         with patch("bot._get_access_token", return_value="tok"):
             _get_cached_token("id", "sec")
         assert bot._token_cache["token"] == "tok"
@@ -452,6 +559,7 @@ class TestHealthCheck:
 
     def test_health_token_cached_true(self, client):
         import bot
+
         bot._token_cache["token"] = "tok"
         resp = client.get("/health")
         data = resp.get_json()
@@ -504,7 +612,9 @@ class TestReplyReturnValue:
         assert result is False
 
     def test_reply_returns_false_on_network_error(self):
-        with patch("requests.post", side_effect=requests.RequestException("network error")):
+        with patch(
+            "requests.post", side_effect=requests.RequestException("network error")
+        ):
             result = _reply("tok", "msg", "access-tok")
         assert result is False
 
@@ -517,6 +627,7 @@ class TestReplyReturnValue:
 class TestDbMissingLog:
     def test_missing_db_logs_warning(self, tmp_path, caplog):
         import logging
+
         with caplog.at_level(logging.WARNING):
             _handle("統計", str(tmp_path / "no.db"))
         assert "資料庫不存在" in caplog.text
@@ -527,6 +638,7 @@ class TestHandleRunScrape:
 
     def setup_method(self):
         import bot
+
         bot._scrape_state["running"] = False
         bot._scrape_state["mode"] = None
         bot._scrape_state["started_at"] = None
@@ -543,6 +655,7 @@ class TestHandleRunScrape:
 
     def test_already_running_rejected(self, db_path):
         import bot
+
         bot._scrape_state["running"] = True
         bot._scrape_state["mode"] = "test"
         with patch.dict(os.environ, {"LINE_USER_ID": "user123"}):
@@ -550,21 +663,27 @@ class TestHandleRunScrape:
         assert "執行中" in result
 
     def test_authorized_launches_scraper(self, db_path):
-        with patch("bot._start_scraper_thread") as mock_start, \
-             patch.dict(os.environ, {"LINE_USER_ID": "user123"}):
+        with (
+            patch("bot._start_scraper_thread") as mock_start,
+            patch.dict(os.environ, {"LINE_USER_ID": "user123"}),
+        ):
             result = _handle("執行 test", db_path, user_id="user123")
         mock_start.assert_called_once_with("test", db_path)
         assert "🚀" in result
 
     def test_run_status_idle(self, db_path):
         import bot
+
         bot._scrape_state["running"] = False
         result = _handle("執行狀態", db_path)
         assert "💤" in result
 
     def test_run_status_running(self, db_path):
         import bot
+
         bot._scrape_state["running"] = True
         bot._scrape_state["mode"] = "full"
+        bot._scrape_state["started_at"] = "2026-03-17T03:00:00"
         result = _handle("執行狀態", db_path)
         assert "full" in result
+        assert "已執行" in result

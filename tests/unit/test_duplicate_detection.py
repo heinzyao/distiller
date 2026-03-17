@@ -43,51 +43,50 @@ class TestDuplicateDetection:
     """驗證 _should_skip_run() 重複執行檢測邏輯。"""
 
     def test_skips_when_recent_successful_run(self):
-        """2 小時內有成功的執行記錄時，_should_skip_run 應回傳 True。"""
+        """2 小時內有成功的執行記錄時，_should_skip_run 應回傳 (True, timestamp)。"""
         import run as run_module
 
         recent_time = (datetime.now() - timedelta(hours=2)).isoformat()
         storage_mock = _make_storage_mock_with_row((recent_time,))
 
-        result = run_module._should_skip_run(storage_mock)
+        skip, last_run_at = run_module._should_skip_run(storage_mock)
 
-        assert result is True
+        assert skip is True
+        assert last_run_at == recent_time
 
     def test_proceeds_when_no_recent_run(self):
-        """scrape_runs 表為空時，_should_skip_run 應回傳 False，允許爬取繼續。"""
+        """scrape_runs 表為空時，_should_skip_run 應回傳 (False, '')，允許爬取繼續。"""
         import run as run_module
 
         storage_mock = _make_storage_mock_empty()
 
-        result = run_module._should_skip_run(storage_mock)
+        skip, last_run_at = run_module._should_skip_run(storage_mock)
 
-        assert result is False
+        assert skip is False
+        assert last_run_at == ""
 
     def test_proceeds_when_recent_run_failed(self):
-        """2 小時前有失敗的執行記錄時，_should_skip_run 應回傳 False（失敗不阻擋）。"""
+        """2 小時前有失敗的執行記錄時，_should_skip_run 應回傳 (False, '')（失敗不阻擋）。"""
         import run as run_module
 
-        # 查詢只選 status IN ('completed', 'completed_with_errors')，失敗的 run 不會出現
-        # 所以這個查詢應回傳 None
         storage_mock = _make_storage_mock_empty()
 
-        result = run_module._should_skip_run(storage_mock)
+        skip, last_run_at = run_module._should_skip_run(storage_mock)
 
-        assert result is False
+        assert skip is False
 
     def test_proceeds_when_run_is_old(self):
-        """25 小時前的成功執行（超出窗口）時，_should_skip_run 應回傳 False。"""
+        """25 小時前的成功執行（超出窗口）時，_should_skip_run 應回傳 (False, '')。"""
         import run as run_module
 
-        # 25 小時前的執行超出 DUPLICATE_RUN_WINDOW_HOURS (20)，查詢應回傳 None
         storage_mock = _make_storage_mock_empty()
 
-        result = run_module._should_skip_run(storage_mock)
+        skip, last_run_at = run_module._should_skip_run(storage_mock)
 
-        assert result is False
+        assert skip is False
 
     def test_proceeds_when_db_check_fails(self):
-        """DB 查詢拋出 sqlite3.Error 時，_should_skip_run 應 fail-open（回傳 False）。"""
+        """DB 查詢拋出 sqlite3.Error 時，_should_skip_run 應 fail-open（回傳 (False, '')）。"""
         import run as run_module
 
         storage_mock = MagicMock(spec=SQLiteStorage)
@@ -95,17 +94,17 @@ class TestDuplicateDetection:
         conn_mock.execute.side_effect = sqlite3.Error("table not found")
         storage_mock.conn = conn_mock
 
-        result = run_module._should_skip_run(storage_mock)
+        skip, last_run_at = run_module._should_skip_run(storage_mock)
 
-        assert result is False
+        assert skip is False
 
     def test_partial_success_counts_as_successful(self):
-        """status='completed_with_errors' 的執行也視為成功，應回傳 True（跳過）。"""
+        """status='completed_with_errors' 的執行也視為成功，應回傳 (True, timestamp)（跳過）。"""
         import run as run_module
 
         recent_time = (datetime.now() - timedelta(hours=1)).isoformat()
         storage_mock = _make_storage_mock_with_row((recent_time,))
 
-        result = run_module._should_skip_run(storage_mock)
+        skip, last_run_at = run_module._should_skip_run(storage_mock)
 
-        assert result is True
+        assert skip is True

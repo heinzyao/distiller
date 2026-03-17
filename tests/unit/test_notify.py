@@ -15,6 +15,7 @@ from distiller_scraper.notify import LINE_PUSH_URL, LINE_TOKEN_URL, LineNotifier
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def notifier():
     return LineNotifier(
@@ -49,6 +50,7 @@ def _mock_push_response(status_code=200):
 # 初始化與設定
 # ---------------------------------------------------------------------------
 
+
 class TestInit:
     def test_explicit_credentials(self, notifier):
         assert notifier.channel_id == "test-id"
@@ -68,7 +70,11 @@ class TestInit:
         monkeypatch.setenv("LINE_CHANNEL_ID", "env-id")
         monkeypatch.setenv("LINE_CHANNEL_SECRET", "env-secret")
         monkeypatch.setenv("LINE_USER_ID", "U_env")
-        n = LineNotifier(channel_id="explicit-id", channel_secret="explicit-secret", user_id="U_explicit")
+        n = LineNotifier(
+            channel_id="explicit-id",
+            channel_secret="explicit-secret",
+            user_id="U_explicit",
+        )
         assert n.channel_id == "explicit-id"
         assert n.channel_secret == "explicit-secret"
         assert n.user_id == "U_explicit"
@@ -107,9 +113,13 @@ class TestIsConfigured:
 # _get_access_token()
 # ---------------------------------------------------------------------------
 
+
 class TestGetAccessToken:
     def test_success(self, notifier):
-        with patch("distiller_scraper.notify.requests.post", return_value=_mock_token_response()) as mock_post:
+        with patch(
+            "distiller_scraper.notify.requests.post",
+            return_value=_mock_token_response(),
+        ) as mock_post:
             token = notifier._get_access_token()
         assert token == "mock-access-token"
         call_kwargs = mock_post.call_args
@@ -126,7 +136,10 @@ class TestGetAccessToken:
         assert token is None
 
     def test_connection_error_returns_none(self, notifier):
-        with patch("distiller_scraper.notify.requests.post", side_effect=requests.ConnectionError):
+        with patch(
+            "distiller_scraper.notify.requests.post",
+            side_effect=requests.ConnectionError,
+        ):
             token = notifier._get_access_token()
         assert token is None
 
@@ -135,10 +148,14 @@ class TestGetAccessToken:
 # send()
 # ---------------------------------------------------------------------------
 
+
 class TestSend:
     def test_success(self, notifier):
         with patch.object(notifier, "_get_access_token", return_value="tok"):
-            with patch("distiller_scraper.notify.requests.post", return_value=_mock_push_response()) as mock_post:
+            with patch(
+                "distiller_scraper.notify.requests.post",
+                return_value=_mock_push_response(),
+            ) as mock_post:
                 result = notifier.send("Hello")
         assert result is True
         call_kwargs = mock_post.call_args
@@ -160,13 +177,19 @@ class TestSend:
 
     def test_push_http_error_returns_false(self, notifier):
         with patch.object(notifier, "_get_access_token", return_value="tok"):
-            with patch("distiller_scraper.notify.requests.post", return_value=_mock_push_response(401)):
+            with patch(
+                "distiller_scraper.notify.requests.post",
+                return_value=_mock_push_response(401),
+            ):
                 result = notifier.send("Hello")
         assert result is False
 
     def test_push_connection_error_returns_false(self, notifier):
         with patch.object(notifier, "_get_access_token", return_value="tok"):
-            with patch("distiller_scraper.notify.requests.post", side_effect=requests.ConnectionError):
+            with patch(
+                "distiller_scraper.notify.requests.post",
+                side_effect=requests.ConnectionError,
+            ):
                 result = notifier.send("Hello")
         assert result is False
 
@@ -174,6 +197,7 @@ class TestSend:
 # ---------------------------------------------------------------------------
 # notify_success()
 # ---------------------------------------------------------------------------
+
 
 class TestNotifySuccess:
     def test_formats_message(self, notifier):
@@ -210,10 +234,37 @@ class TestNotifySuccess:
         msg = mock_send.call_args[0][0]
         assert "?" in msg
 
+    def test_duration_shown_when_nonzero(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_success("test", {}, duration_secs=120)
+        msg = mock_send.call_args[0][0]
+        assert "2 分 0 秒" in msg
+        assert "⏱" in msg
+
+    def test_duration_hidden_when_zero(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_success("test", {}, duration_secs=0)
+        msg = mock_send.call_args[0][0]
+        assert "⏱" not in msg
+
+    def test_page_errors_shown_when_nonzero(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_success("test", {}, page_errors=3)
+        msg = mock_send.call_args[0][0]
+        assert "頁面錯誤" in msg
+        assert "3" in msg
+
+    def test_page_errors_hidden_when_zero(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_success("test", {})
+        msg = mock_send.call_args[0][0]
+        assert "頁面錯誤" not in msg
+
 
 # ---------------------------------------------------------------------------
 # notify_failure()
 # ---------------------------------------------------------------------------
+
 
 class TestNotifyFailure:
     def test_formats_message_with_error(self, notifier):
@@ -238,13 +289,17 @@ class TestNotifyFailure:
 
     def test_error_details_in_message(self, notifier):
         with patch.object(notifier, "send", return_value=True) as mock_send:
-            notifier.notify_failure("full", "Some error", error_details="url1 url2 url3")
+            notifier.notify_failure(
+                "full", "Some error", error_details="url1 url2 url3"
+            )
         msg = mock_send.call_args[0][0]
         assert "url1 url2 url3" in msg
 
     def test_zero_page_errors_and_empty_details_backward_compat(self, notifier):
         with patch.object(notifier, "send", return_value=True) as mock_send:
-            result_new = notifier.notify_failure("full", "Driver crashed", page_errors=0, error_details="")
+            result_new = notifier.notify_failure(
+                "full", "Driver crashed", page_errors=0, error_details=""
+            )
         msg_new = mock_send.call_args[0][0]
         with patch.object(notifier, "send", return_value=True) as mock_send2:
             notifier.notify_failure("full", "Driver crashed")
@@ -254,13 +309,66 @@ class TestNotifyFailure:
 
     def test_line_api_failure_returns_false_only(self, notifier):
         with patch.object(notifier, "send", return_value=False) as mock_send:
-            result = notifier.notify_failure("full", "Driver crashed", page_errors=3, error_details="url1")
+            result = notifier.notify_failure(
+                "full", "Driver crashed", page_errors=3, error_details="url1"
+            )
         assert result is False
         mock_send.assert_called_once()
 
     def test_page_errors_and_error_details_combined(self, notifier):
         with patch.object(notifier, "send", return_value=True) as mock_send:
-            notifier.notify_failure("full", "Timeout", page_errors=7, error_details="/whiskey /gin")
+            notifier.notify_failure(
+                "full", "Timeout", page_errors=7, error_details="/whiskey /gin"
+            )
         msg = mock_send.call_args[0][0]
         assert "7" in msg
         assert "/whiskey /gin" in msg
+
+    def test_duration_shown_in_failure(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_failure("full", "Timeout", duration_secs=60)
+        msg = mock_send.call_args[0][0]
+        assert "1 分 0 秒" in msg
+        assert "⏱" in msg
+
+    def test_duration_hidden_when_zero_in_failure(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_failure("full", "Timeout", duration_secs=0)
+        msg = mock_send.call_args[0][0]
+        assert "⏱" not in msg
+
+
+# ---------------------------------------------------------------------------
+# notify_skipped()
+# ---------------------------------------------------------------------------
+
+
+class TestNotifySkipped:
+    def test_skipped_message_header(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_skipped("full")
+        msg = mock_send.call_args[0][0]
+        assert "⏭️" in msg
+
+    def test_skipped_shows_mode(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_skipped("medium")
+        msg = mock_send.call_args[0][0]
+        assert "medium" in msg
+
+    def test_skipped_shows_last_run_at(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_skipped("full", last_run_at="2026-03-16T15:45:30")
+        msg = mock_send.call_args[0][0]
+        assert "2026-03-16 15:45" in msg
+
+    def test_skipped_omits_last_run_at_when_empty(self, notifier):
+        with patch.object(notifier, "send", return_value=True) as mock_send:
+            notifier.notify_skipped("full", last_run_at="")
+        msg = mock_send.call_args[0][0]
+        assert "上次執行" not in msg
+
+    def test_skipped_returns_send_result(self, notifier):
+        with patch.object(notifier, "send", return_value=False):
+            result = notifier.notify_skipped("full")
+        assert result is False
