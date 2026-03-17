@@ -2,6 +2,34 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.6.0] - 2026-03-17
+
+### 新增
+- **`scroll_page()` 捲動重試機制**：`JavascriptException`（`document.body` 為 null）時自動重試，最多 `MAX_SCROLL_RETRIES`（預設 3）次，每次間隔 1 秒
+- **Driver 重啟觸發條件擴充**：`_should_restart()` 新增兩項 JS null 錯誤字串（`Cannot read properties of null`、`null is not an object`），與既有的 `invalid session id` / `session deleted` 並列
+- **`_health_check()` 預飛檢測**：`scrape()` 啟動後、類別迴圈前執行健康檢查，載入 BASE_URL 並確認 `document.body.scrollHeight` 可讀；失敗則放棄整次爬取
+- **頁面層級重試**：`scrape_category_paginated()` 每頁加入最多 `PAGE_RETRY_COUNT`（預設 2）次重試，最後一次失敗時自動嘗試 driver 重啟
+- **`scrape_runs` 執行紀錄**：`run_test` / `run_medium` / `run_full` 皆呼叫 `storage.record_scrape_run()` 與 `storage.finish_scrape_run()`，正確寫入 `status`（`completed` / `completed_with_errors` / `failed`）
+- **重複執行防護**：`_should_skip_run(storage)` 於每次 run 函式開頭檢查 20 小時內是否已有成功執行，有則提前返回（fail-open：DB 查詢失敗時不跳過）
+- **LINE 失敗通知強化**：`notify_failure()` 新增 `page_errors: int` 與 `error_details: str` 參數，通知訊息顯示頁面錯誤數與錯誤詳情區塊
+- **`run_scraper.sh` 遷移至 `uv run`**：移除 venv 啟動邏輯，改為 `uv run python run.py ...`；同時修正 `EXIT_CODE=${PIPESTATUS[0]}` 正確抓取 tee 管線前的退出碼
+
+### 失敗處理常數（`config.py`）
+| 常數 | 預設值 | 用途 |
+|------|--------|------|
+| `MAX_SCROLL_RETRIES` | 3 | scroll_page() 重試上限 |
+| `MAX_RESTART_ATTEMPTS` | 2 | 單次爬取 driver 重啟上限 |
+| `HEALTH_CHECK_TIMEOUT` | 10 | 健康檢查逾時（秒） |
+| `PAGE_RETRY_COUNT` | 2 | 頁面重試次數 |
+| `RESTART_TRIGGER_ERRORS` | (list) | 觸發重啟的錯誤字串清單 |
+| `DUPLICATE_RUN_WINDOW_HOURS` | 20 | 重複執行檢測窗口（小時） |
+
+### 測試
+- **新增 36 個測試**（303 → 339 passed）
+- 新增測試模組：`test_scroll_page.py`、`test_restart_driver.py`、`test_health_check.py`、`test_retry_logic.py`、`test_scrape_runs.py`、`test_duplicate_detection.py`
+- `test_notify.py` 新增 5 個 `notify_failure()` 擴充測試
+- `test_config.py` 新增 6 個失敗處理常數驗證測試
+
 ## [2.5.3] - 2026-03-14
 
 ### 修復

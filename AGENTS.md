@@ -19,6 +19,33 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-03-17 | OpenCode Atlas Orchestrator
+
+**工作內容**：
+1. **P0–P3 失敗處理全面強化（TDD）**
+   - **Task 3：`scroll_page()` 捲動重試**：`JavascriptException`（`document.body` 為 null）時自動重試，最多 `MAX_SCROLL_RETRIES` 次（預設 3），每次間隔 1 秒；新增 4 個測試
+   - **Task 4：Driver 重啟觸發條件擴充**：`_should_restart()` 新增 JS null 錯誤字串；新增 6 個測試
+   - **Task 5：`scrape_runs` 執行紀錄接線**：三個 run function 正確呼叫 `record_scrape_run()` / `finish_scrape_run()`，寫入正確 status；新增 5 個測試
+   - **Task 6：`PIPESTATUS` 退出碼修正**：`run_scraper.sh` 用 `EXIT_CODE=${PIPESTATUS[0]}` 正確抓取 tee 管線前退出碼
+   - **Task 7：`_health_check()` 預飛檢測**：`scrape()` 開始前執行健康檢查，失敗則中止整次爬取；新增 5 個測試
+   - **Task 8：頁面層級重試**：`scrape_category_paginated()` 每頁最多重試 `PAGE_RETRY_COUNT` 次，最後一次失敗自動重啟 driver；新增 5 個整合測試
+   - **Task 9：重複執行防護**：`_should_skip_run(storage)` 於每次 run 開頭檢查 20 小時內的成功執行紀錄；新增 6 個測試
+   - **Task 10：LINE 失敗通知強化**：`notify_failure()` 新增 `page_errors` / `error_details` 參數；新增 5 個測試
+   - **Task 11：`run_scraper.sh` 遷移 `uv run`**：移除 venv 邏輯，改為 `uv run python run.py`
+
+2. **TDD 流程**：每項功能均先撰寫失敗測試（RED），再實作至測試通過（GREEN）
+
+**主要變更**：
+- 修改 `distiller_scraper/scraper.py`（scroll 重試、restart 觸發擴充、健康檢查、頁面重試）
+- 修改 `distiller_scraper/config.py`（新增 6 個失敗處理常數）
+- 修改 `distiller_scraper/notify.py`（`notify_failure()` 擴充參數）
+- 修改 `run.py`（scrape_runs 接線、重複執行防護）
+- 修改 `scripts/run_scraper.sh`（PIPESTATUS 修正、uv run 遷移）
+- 新增 6 個測試模組（`test_scroll_page.py`、`test_restart_driver.py`、`test_health_check.py`、`test_retry_logic.py`、`test_scrape_runs.py`、`test_duplicate_detection.py`）
+- **總計：339 個測試全數通過**（基準 303，新增 36）
+
+**Commits**：`59bd096`、`f595f4a`、`4a56d99`、`c15d9ea`
+
 ### 2026-03-10 | Claude Code
 
 **工作內容**：
