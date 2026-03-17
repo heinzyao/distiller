@@ -7,6 +7,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import sqlite3
 import sys
 import time
@@ -116,15 +117,15 @@ def _make_signature(body: bytes, secret: str) -> str:
     return base64.b64encode(digest).decode()
 
 
-def _webhook_payload(text: str, reply_token: str = "test-reply-token") -> dict:
+def _webhook_payload(text: str, reply_token: str = "test-reply-token", user_id: str = "") -> dict:
     return {
         "events": [{
             "type": "message",
             "replyToken": reply_token,
+            "source": {"userId": user_id},
             "message": {"type": "text", "text": text},
         }]
     }
-
 
 # ---------------------------------------------------------------------------
 # 指令解析
@@ -164,6 +165,22 @@ class TestParseCommand:
     def test_unknown(self):
         cmd, _ = parse_command("隨便說點什麼")
         assert cmd == "unknown"
+
+    def test_run_test_zh(self):
+        cmd, args = parse_command("執行 test")
+        assert cmd == "run_scrape" and args == ["test"]
+
+    def test_run_medium_en(self):
+        cmd, args = parse_command("run medium")
+        assert cmd == "run_scrape" and args == ["medium"]
+
+    def test_run_full_zh(self):
+        cmd, args = parse_command("執行 full")
+        assert cmd == "run_scrape" and args == ["full"]
+
+    def test_run_status(self):
+        cmd, args = parse_command("執行狀態")
+        assert cmd == "run_status" and args == []
 
 
 # ---------------------------------------------------------------------------
@@ -247,6 +264,10 @@ class TestFmtHelp:
         result = fmt_help()
         for cmd in ("top", "搜尋", "詳情", "統計", "風味", "列表"):
             assert cmd in result
+
+    def test_contains_run_commands(self):
+        result = fmt_help()
+        assert "執行" in result
 
 
 # ---------------------------------------------------------------------------
@@ -499,3 +520,51 @@ class TestDbMissingLog:
         with caplog.at_level(logging.WARNING):
             _handle("統計", str(tmp_path / "no.db"))
         assert "資料庫不存在" in caplog.text
+
+
+class TestHandleRunScrape:
+    """👉 LINE 爬蟲執行指令測試。"""
+
+    def setup_method(self):
+        import bot
+        bot._scrape_state["running"] = False
+        bot._scrape_state["mode"] = None
+        bot._scrape_state["started_at"] = None
+
+    def test_unauthorized_user_rejected(self, db_path):
+        with patch.dict(os.environ, {"LINE_USER_ID": "correct_user"}):
+            result = _handle("執行 test", db_path, user_id="wrong_user")
+        assert "⛔" in result
+
+    def test_no_user_id_rejected(self, db_path):
+        with patch.dict(os.environ, {"LINE_USER_ID": "correct_user"}):
+            result = _handle("執行 test", db_path, user_id=None)
+        assert "⛔" in result
+
+    def test_already_running_rejected(self, db_path):
+        import bot
+        bot._scrape_state["running"] = True
+        bot._scrape_state["mode"] = "test"
+        with patch.dict(os.environ, {"LINE_USER_ID": "user123"}):
+            result = _handle("執行 test", db_path, user_id="user123")
+        assert "執行中" in result
+
+    def test_authorized_launches_scraper(self, db_path):
+        with patch("bot._start_scraper_thread") as mock_start, \
+             patch.dict(os.environ, {"LINE_USER_ID": "user123"}):
+            result = _handle("執行 test", db_path, user_id="user123")
+        mock_start.assert_called_once_with("test", db_path)
+        assert "🚀" in result
+
+    def test_run_status_idle(self, db_path):
+        import bot
+        bot._scrape_state["running"] = False
+        result = _handle("執行狀態", db_path)
+        assert "💤" in result
+
+    def test_run_status_running(self, db_path):
+        import bot
+        bot._scrape_state["running"] = True
+        bot._scrape_state["mode"] = "full"
+        result = _handle("執行狀態", db_path)
+        assert "full" in result

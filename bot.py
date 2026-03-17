@@ -32,10 +32,13 @@ import logging
 import os
 import re
 import sqlite3
+import subprocess
 import sys
-from typing import cast
+import threading
 import time
+from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 
 import requests
@@ -64,6 +67,14 @@ _MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}  # Top 3 排行獎牌
 # 設計理由：LINE Channel Access Token 有效期 30 天，但短期 token 有效期約 30 天
 # 此處使用 23 小時 TTL（82800 秒），在到期前 60 秒自動更新（_get_cached_token 邏輯）
 _token_cache: dict[str, str | float] = {}
+
+# 爬蟲執行狀態：追蹤背景執行的爬蟲進程
+_scrape_lock = threading.Lock()
+_scrape_state: dict = {
+    "running": False,
+    "mode": None,
+    "started_at": None,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +150,33 @@ def _reply(reply_token: str, text: str, access_token: str) -> bool:
     except requests.RequestException as exc:
         logger.error("Reply 請求失敗：%s", exc)
         return False
+
+
+def _start_scraper_thread(mode: str, db_path: str) -> None:
+    """在背景執行緒中啟動爬蟲，完成後由 run.py --notify-line 自動推播通知。"""
+    run_py = str(Path(__file__).parent / "run.py")
+    cmd = [
+        sys.executable, run_py,
+        "--mode", mode,
+        "--output", "sqlite",
+        "--db-path", db_path,
+        "--notify-line",
+    ]
+
+    def _run() -> None:
+        with _scrape_lock:
+            _scrape_state["running"] = True
+            _scrape_state["mode"] = mode
+            _scrape_state["started_at"] = datetime.now().isoformat(timespec="seconds")
+        try:
+            subprocess.run(cmd, capture_output=False)
+        finally:
+            with _scrape_lock:
+                _scrape_state["running"] = False
+                _scrape_state["mode"] = None
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
 
 
 # ---------------------------------------------------------------------------
@@ -416,6 +454,17 @@ def fmt_list(
     return "\n".join(lines)
 
 
+def fmt_run_status() -> str:
+    """回傳爬蟲目前執行狀態。"""
+    with _scrape_lock:
+        running = _scrape_state.get("running", False)
+        mode = _scrape_state.get("mode")
+        started_at = _scrape_state.get("started_at")
+    if running:
+        return f"🔄 爬蟲執行中\n模式：{mode}\n開始時間：{started_at}"
+    return "💤 目前無爬蟲執行中"
+
+
 def fmt_help() -> str:
     return "\n".join([
         "🥃 Distiller 查詢指令",
@@ -436,6 +485,12 @@ def fmt_help() -> str:
         "風味 [名稱]  維度排行",
         "  例：風味 smoky",
         "",
+        "",
+        "🤖 爬蟲指令（僅授權使用者）",
+        "執行 test / medium / full",
+        "  啟動爬蟲（完成後推播通知）",
+        "執行狀態",
+        "  查看目前執行狀態",
         "❓ 說明  顯示本說明",
     ])
 
@@ -487,6 +542,14 @@ def parse_command(text: str) -> tuple[str, list[str | int | None]]:
             country = None
         return "list", [country, score]
 
+    # 執行爬蟲
+    m = re.match(r"^(執行|run)\s+(test|medium|full)$", text, re.IGNORECASE)
+    if m:
+        return "run_scrape", [m.group(2).lower()]
+
+    if lower in ("執行狀態", "run status", "爬蟲狀態"):
+        return "run_status", []
+
     return "unknown", [text]
 
 
@@ -537,7 +600,9 @@ def create_app(
             user_text = event["message"]["text"]
             logger.info("收到訊息：%s", user_text)
 
-            response = _handle(user_text, db_path)
+            user_id = event.get("source", {}).get("userId", "")
+
+            response = _handle(user_text, db_path, user_id=user_id)
 
             token = _get_cached_token(_channel_id, _channel_secret)
             if token:
@@ -551,7 +616,7 @@ def create_app(
     return app
 
 
-def _handle(text: str, db_path: str) -> str:
+def _handle(text: str, db_path: str, user_id: str | None = None) -> str:
     """解析指令並回傳回覆文字。"""
     if not Path(db_path).exists():
         logger.warning("資料庫不存在：%s", db_path)
@@ -593,6 +658,18 @@ def _handle(text: str, db_path: str) -> str:
             else:
                 min_score = None
             return fmt_list(db_path, country, min_score)
+        elif command == "run_status":
+            return fmt_run_status()
+        elif command == "run_scrape":
+            authorized_user_id = os.getenv("LINE_USER_ID", "")
+            if not authorized_user_id or user_id != authorized_user_id:
+                return "⛔ 僅授權使用者可執行爬蟲指令。"
+            with _scrape_lock:
+                if _scrape_state.get("running"):
+                    return f"⚠️ 爬蟲正在執行中（{_scrape_state.get('mode')} 模式），請稍後再試。"
+            mode = str(args[0])
+            _start_scraper_thread(mode, db_path)
+            return f"🚀 爬蟲已啟動（{mode} 模式），完成後將推播通知您。"
         else:
             return f"不認識指令「{text}」。\n傳送「說明」查看所有指令。"
     except Exception as exc:
