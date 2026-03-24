@@ -33,32 +33,32 @@ class ScraperConfig:
     """爬蟲設定：所有可調參數的集中管理。"""
 
     # ── 瀏覽器設定 ──
-    HEADLESS = True             # 無頭模式：不顯示瀏覽器視窗（生產環境建議 True）
-    WINDOW_SIZE = "1920,1080"   # 視窗尺寸：影響頁面 layout 與元素可見性
-    PAGE_LOAD_TIMEOUT = 60      # 頁面載入逾時（秒），Distiller 部分頁面較慢
-    ELEMENT_WAIT_TIMEOUT = 30   # 等待元素出現的逾時（秒），用於 Selenium WebDriverWait
+    HEADLESS = True  # 無頭模式：不顯示瀏覽器視窗（生產環境建議 True）
+    WINDOW_SIZE = "1920,1080"  # 視窗尺寸：影響頁面 layout 與元素可見性
+    PAGE_LOAD_TIMEOUT = 60  # 頁面載入逾時（秒），Distiller 部分頁面較慢
+    ELEMENT_WAIT_TIMEOUT = 30  # 等待元素出現的逾時（秒），用於 Selenium WebDriverWait
 
     # ── 延遲設定（秒）──
     # 延遲的設計理由：模擬人類瀏覽行為，降低被網站封鎖的機率
-    DELAY_MIN = 2               # 爬取間隨機延遲下限（秒）
-    DELAY_MAX = 4               # 爬取間隨機延遲上限（秒）
-    CATEGORY_DELAY = 8          # 類別切換時的等待時間（讓伺服器有恢復時間）
-    SCROLL_DELAY = 2            # 頁面滾動後的等待時間（等 JavaScript lazy-load 完成）
-    INITIAL_PAGE_DELAY = 5      # 頁面初次載入後的等待（等 React hydration 完成）
+    DELAY_MIN = 2  # 爬取間隨機延遲下限（秒）
+    DELAY_MAX = 4  # 爬取間隨機延遲上限（秒）
+    CATEGORY_DELAY = 8  # 類別切換時的等待時間（讓伺服器有恢復時間）
+    SCROLL_DELAY = 2  # 頁面滾動後的等待時間（等 JavaScript lazy-load 完成）
+    INITIAL_PAGE_DELAY = 5  # 頁面初次載入後的等待（等 React hydration 完成）
 
     # ── 爬取上限 ──
     MAX_SPIRITS_PER_CATEGORY = 150  # 每類別最多爬取的烈酒數量
-    MAX_SCROLL_ATTEMPTS = 15        # 滾動模式下最多滾動次數（避免無限滾動）
-    MAX_RETRIES = 3                 # 單一 URL 的最大重試次數（應對 session 斷開）
+    MAX_SCROLL_ATTEMPTS = 15  # 滾動模式下最多滾動次數（避免無限滾動）
+    MAX_RETRIES = 3  # 單一 URL 的最大重試次數（應對 session 斷開）
 
     # ── 分頁設定 ──
-    PAGINATION_ENABLED = True       # 預設啟用分頁模式（比滾動模式可爬取更多資料）
-    MAX_PAGES_PER_QUERY = 50        # 單一查詢最多翻頁數（安全閥，防無限翻頁）
-    PAGE_PARAM = "page"             # URL 分頁參數名稱（?page=N）
+    PAGINATION_ENABLED = True  # 預設啟用分頁模式（比滾動模式可爬取更多資料）
+    MAX_PAGES_PER_QUERY = 50  # 單一查詢最多翻頁數（安全閥，防無限翻頁）
+    PAGE_PARAM = "page"  # URL 分頁參數名稱（?page=N）
     # 停止分頁的判斷條件（三道防線）
-    MIN_NEW_URLS_PER_PAGE = 2       # 每頁至少需取得此數量的新 URL（否則意義不大）
-    DUPLICATE_RATIO_THRESHOLD = 0.8 # 重複 URL 比例超過此值時停止（接近資料邊界）
-    MAX_CONSECUTIVE_DUP_PAGES = 3   # 連續 N 頁全為已知 URL 時停止分頁（確定到達邊界）
+    MIN_NEW_URLS_PER_PAGE = 2  # 每頁至少需取得此數量的新 URL（否則意義不大）
+    DUPLICATE_RATIO_THRESHOLD = 0.8  # 重複 URL 比例超過此值時停止（接近資料邊界）
+    MAX_CONSECUTIVE_DUP_PAGES = 3  # 連續 N 頁全為已知 URL 時停止分頁（確定到達邊界）
 
     # 類別列表
     CATEGORIES = [
@@ -123,23 +123,23 @@ class ScraperConfig:
     ]
 
     # ── 失敗處理與回復 (Failure Handling & Recovery) ──
-    MAX_SCROLL_RETRIES = 3          # scroll_page() 遇到 null body 時的最大重試次數
-    MAX_RESTART_ATTEMPTS = 2        # 單次爬取中 driver 重啟的最大次數（超過則放棄）
-    HEALTH_CHECK_TIMEOUT = 10       # 健康檢查頁面載入逾時（秒）
-    PAGE_RETRY_COUNT = 2            # 單一頁面失敗時的重試次數
-    RESTART_TRIGGER_ERRORS = [      # 觸發 driver 重啟的錯誤字串（任一子字串匹配即觸發）
-        "invalid session id",       # Selenium session 過期
-        "session deleted",          # Chrome 主動斷開 session
+    MAX_SCROLL_RETRIES = 3  # scroll_page() 遇到 null body 時的最大重試次數
+    MAX_RESTART_ATTEMPTS = 2  # 單次爬取中 driver 重啟的最大次數（超過則放棄）
+    HEALTH_CHECK_TIMEOUT = 10  # 健康檢查頁面載入逾時（秒）
+    PAGE_RETRY_COUNT = 2  # 單一頁面失敗時的重試次數
+    RESTART_TRIGGER_ERRORS = [  # 觸發 driver 重啟的錯誤字串（任一子字串匹配即觸發）
+        "invalid session id",  # Selenium session 過期
+        "session deleted",  # Chrome 主動斷開 session
         "Cannot read properties of null",  # JS null body (document.body 為 null)
-        "null is not an object",    # Safari 風格 JS null 錯誤（防禦性）
+        "null is not an object",  # Safari 風格 JS null 錯誤（防禦性）
     ]
-    DUPLICATE_RUN_WINDOW_HOURS = 20 # 重複執行檢測窗口（小時），窗口內有成功執行則跳過
+    DUPLICATE_RUN_WINDOW_HOURS = 20  # 重複執行檢測窗口（小時），窗口內有成功執行則跳過
 
     # User-Agent
     USER_AGENT = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/145.0.0.0 Safari/537.36"
+        "Chrome/146.0.0.0 Safari/537.36"
     )
 
     # 輸出設定

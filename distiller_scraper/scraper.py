@@ -177,9 +177,26 @@ class DistillerScraperV2:
         delay = random.uniform(min_sec, max_sec)
         time.sleep(delay)
 
+    def _wait_for_body(self, timeout: int = None) -> bool:
+        """等待 document.body 存在（page_load_strategy='none' 時 body 可能短暫為 null）。"""
+        timeout = timeout or ScraperConfig.HEALTH_CHECK_TIMEOUT
+        try:
+            WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
+            return True
+        except TimeoutException:
+            logger.warning(f"等待 document.body 逾時（{timeout}s）")
+            return False
+
     def scroll_page(self, max_scrolls: int = None):
         """滾動頁面載入更多內容"""
         max_scrolls = max_scrolls or ScraperConfig.MAX_SCROLL_ATTEMPTS
+
+        if not self._wait_for_body():
+            self.page_errors += 1
+            return
+
         for attempt in range(ScraperConfig.MAX_SCROLL_RETRIES):
             try:
                 last_height = self.driver.execute_script(
@@ -298,6 +315,11 @@ class DistillerScraperV2:
             self.driver.get(url)
             time.sleep(ScraperConfig.INITIAL_PAGE_DELAY)
 
+            # 等待 <body> 就緒，防止 scrollHeight null 錯誤
+            if not self._wait_for_body():
+                logger.warning("capture_xhr_requests: body 未就緒，跳過 XHR 擷取")
+                return []
+
             # 清空現有 performance log
             self.driver.get_log("performance")
 
@@ -360,6 +382,11 @@ class DistillerScraperV2:
         """
         self.driver.get(page_url)
         time.sleep(ScraperConfig.INITIAL_PAGE_DELAY)
+
+        if not self._wait_for_body():
+            self.page_errors += 1
+            return []
+
         self.scroll_page()
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
         return self.extract_spirit_urls_from_list(soup)
