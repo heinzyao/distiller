@@ -8,6 +8,7 @@ Distiller 爬蟲 V2 執行腳本
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from datetime import datetime, timedelta
@@ -288,6 +289,15 @@ def main():
     print(f"\n開始時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     _run_start = time.time()
 
+    # GCS 下載：爬取前從 GCS 取得最新 DB（僅 sqlite/both 輸出模式且設定了 GCS_BUCKET）
+    gcs_bucket = os.getenv("GCS_BUCKET", "")
+    if gcs_bucket and args.output in ("sqlite", "both"):
+        from distiller_scraper import gcs_storage
+
+        gcs_db_blob = os.getenv("GCS_DB_BLOB", "distiller.db")
+        print(f"☁️  從 GCS 下載 DB ({gcs_bucket}/{gcs_db_blob})…")
+        gcs_storage.download_db(gcs_bucket, gcs_db_blob, args.db_path)
+
     if args.mode == "test":
         success, stats = run_test(args.output, args.db_path, args)
     elif args.mode == "medium":
@@ -332,6 +342,15 @@ def main():
             else:
                 label = "LINE 失敗通知已發送"
             print(f"📱 {label}" if ok else "⚠️  LINE 通知發送失敗（請查看日誌）")
+
+    # GCS 上傳：爬取完成後將更新的 DB 上傳（僅 sqlite/both 輸出模式且設定了 GCS_BUCKET）
+    gcs_bucket = os.getenv("GCS_BUCKET", "")
+    if gcs_bucket and args.output in ("sqlite", "both"):
+        from distiller_scraper import gcs_storage
+
+        gcs_db_blob = os.getenv("GCS_DB_BLOB", "distiller.db")
+        print(f"\n☁️  上傳 DB 至 GCS ({gcs_bucket}/{gcs_db_blob})…")
+        gcs_storage.upload_db(gcs_bucket, gcs_db_blob, args.db_path)
 
     if success:
         print("\n✅ 爬蟲執行成功！")

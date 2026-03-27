@@ -7,13 +7,20 @@ __pycache__/
 venv/
 .venv/
 .venv*/
+
+# 環境變數（含所有變體，防止意外 commit 機敏資訊）
 .env
+.env.*
+*.env
 
 # Jupyter
 .ipynb_checkpoints/
 
 # OS
 .DS_Store
+
+# 開發工具筆記（非程式碼產物）
+.sisyphus/
 
 # Logs
 *.log

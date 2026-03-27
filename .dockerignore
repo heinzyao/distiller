@@ -1,0 +1,33 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 環境變數（所有變體）
+.env
+.env.*
+*.env
+.env.example
+
+# 資料與資料庫（不應進入 image）
+distiller.db
+*.db
+*.db-shm
+*.db-wal
+data/
+logs/
+*.log
+
+# Git 與 CI/CD 設定
+.git/
+.github/
+
+# 開發工具
+tests/
+tasks/
+scripts/
+*.plist
+*.md
+pytest.ini
+.ruff_cache/
+.pytest_cache/

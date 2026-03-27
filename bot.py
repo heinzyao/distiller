@@ -52,6 +52,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+# GCS 設定：設定 GCS_BUCKET 時啟用雲端模式，否則維持本機行為
+GCS_BUCKET = os.getenv("GCS_BUCKET", "")
+GCS_DB_BLOB = os.getenv("GCS_DB_BLOB", "distiller.db")
+
 LINE_TOKEN_URL = "https://api.line.me/v2/oauth/accessToken"
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 DB_DEFAULT = "distiller.db"
@@ -181,6 +185,51 @@ def _start_scraper_thread(mode: str, db_path: str) -> None:
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
+
+
+def _start_scraper_cloud_run(mode: str) -> None:
+    """觸發 Cloud Run Job 執行爬蟲（Cloud Run 環境專用）。"""
+    project = os.getenv("GOOGLE_CLOUD_PROJECT", os.getenv("GCLOUD_PROJECT", ""))
+    region = os.getenv("CLOUD_RUN_REGION", "asia-east1")
+    job_name = os.getenv("SCRAPER_JOB_NAME", "distiller-scraper")
+
+    from google.cloud import run_v2  # type: ignore[import]
+
+    client = run_v2.JobsClient()
+    name = f"projects/{project}/locations/{region}/jobs/{job_name}"
+    overrides = run_v2.RunJobRequest.Overrides(
+        container_overrides=[
+            run_v2.RunJobRequest.Overrides.ContainerOverride(
+                args=["--mode", mode, "--output", "sqlite", "--use-api", "--notify-line"]
+            )
+        ]
+    )
+    client.run_job(request=run_v2.RunJobRequest(name=name, overrides=overrides))
+    logger.info("Cloud Run Job 已觸發：%s (mode=%s)", name, mode)
+
+
+def _start_scraper(mode: str, db_path: str) -> None:
+    """啟動爬蟲：Cloud Run 環境使用 Jobs API，本機使用 subprocess 執行緒。"""
+    if GCS_BUCKET and os.getenv("GOOGLE_CLOUD_PROJECT"):
+        _start_scraper_cloud_run(mode)
+        with _scrape_lock:
+            _scrape_state["running"] = True
+            _scrape_state["mode"] = mode
+            _scrape_state["started_at"] = datetime.now().isoformat(timespec="seconds")
+    else:
+        _start_scraper_thread(mode, db_path)
+
+
+def _ensure_db_from_gcs(db_path: str) -> bool:
+    """如果資料庫不存在且設定了 GCS_BUCKET，嘗試從 GCS 下載。"""
+    if Path(db_path).exists():
+        return True
+    if not GCS_BUCKET:
+        return False
+    from distiller_scraper import gcs_storage
+
+    logger.info("資料庫不存在，嘗試從 GCS 下載：%s", db_path)
+    return gcs_storage.download_db(GCS_BUCKET, GCS_DB_BLOB, db_path)
 
 
 # ---------------------------------------------------------------------------
@@ -635,8 +684,9 @@ def create_app(
 def _handle(text: str, db_path: str, user_id: str | None = None) -> str:
     """解析指令並回傳回覆文字。"""
     if not Path(db_path).exists():
-        logger.warning("資料庫不存在：%s", db_path)
-        return "⚠️ 資料庫不存在，請先執行：python run.py --mode test --output sqlite"
+        if not _ensure_db_from_gcs(db_path):
+            logger.warning("資料庫不存在：%s", db_path)
+            return "⚠️ 資料庫不存在，請先執行：python run.py --mode test --output sqlite"
 
     command, args = parse_command(text)
 
@@ -684,7 +734,11 @@ def _handle(text: str, db_path: str, user_id: str | None = None) -> str:
                 if _scrape_state.get("running"):
                     return f"⚠️ 爬蟲正在執行中（{_scrape_state.get('mode')} 模式），請稍後再試。"
             mode = str(args[0])
-            _start_scraper_thread(mode, db_path)
+            try:
+                _start_scraper(mode, db_path)
+            except Exception as exc:
+                logger.error("啟動爬蟲失敗：%s", exc)
+                return f"⚠️ 爬蟲啟動失敗：{exc}"
             return f"🚀 爬蟲已啟動（{mode} 模式），完成後將推播通知您。"
         else:
             return f"不認識指令「{text}」。\n傳送「說明」查看所有指令。"

@@ -1,0 +1,39 @@
+steps:
+  # 建置爬蟲容器（含 Chrome，~1.2 GB）
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.scraper
+      - -t
+      - gcr.io/$PROJECT_ID/distiller-scraper:$COMMIT_SHA
+      - -t
+      - gcr.io/$PROJECT_ID/distiller-scraper:latest
+      - .
+    timeout: 1200s
+
+  # 推送爬蟲容器
+  - name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, gcr.io/$PROJECT_ID/distiller-scraper]
+
+  # 建置 Bot 容器（輕量，~200 MB）
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.bot
+      - -t
+      - gcr.io/$PROJECT_ID/distiller-bot:$COMMIT_SHA
+      - -t
+      - gcr.io/$PROJECT_ID/distiller-bot:latest
+      - .
+
+  # 推送 Bot 容器
+  - name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, gcr.io/$PROJECT_ID/distiller-bot]
+
+images:
+  - gcr.io/$PROJECT_ID/distiller-scraper
+  - gcr.io/$PROJECT_ID/distiller-bot
+
+timeout: 1800s

@@ -1,0 +1,86 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-east1
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Workload Identity Federation 需要
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Workload Identity Federation — 免 Service Account Key
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker gcr.io --quiet
+
+      # ── 爬蟲容器 ──────────────────────────────────────────────
+      - name: Build scraper image
+        run: |
+          docker build \
+            -f Dockerfile.scraper \
+            -t gcr.io/$PROJECT_ID/distiller-scraper:$GITHUB_SHA \
+            -t gcr.io/$PROJECT_ID/distiller-scraper:latest \
+            .
+
+      - name: Push scraper image
+        run: docker push --all-tags gcr.io/$PROJECT_ID/distiller-scraper
+
+      - name: Deploy Cloud Run Job (scraper)
+        run: |
+          gcloud run jobs update distiller-scraper \
+            --image gcr.io/$PROJECT_ID/distiller-scraper:$GITHUB_SHA \
+            --region $REGION \
+          || gcloud run jobs create distiller-scraper \
+            --image gcr.io/$PROJECT_ID/distiller-scraper:$GITHUB_SHA \
+            --region $REGION \
+            --memory 2Gi \
+            --cpu 2 \
+            --task-timeout 3600 \
+            --set-env-vars GCS_BUCKET=distiller-data \
+            --set-secrets LINE_CHANNEL_ID=LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=LINE_CHANNEL_SECRET:latest,LINE_USER_ID=LINE_USER_ID:latest
+
+      # ── Bot 容器 ───────────────────────────────────────────────
+      - name: Build bot image
+        run: |
+          docker build \
+            -f Dockerfile.bot \
+            -t gcr.io/$PROJECT_ID/distiller-bot:$GITHUB_SHA \
+            -t gcr.io/$PROJECT_ID/distiller-bot:latest \
+            .
+
+      - name: Push bot image
+        run: docker push --all-tags gcr.io/$PROJECT_ID/distiller-bot
+
+      - name: Deploy Cloud Run Service (bot)
+        run: |
+          gcloud run deploy distiller-bot \
+            --image gcr.io/$PROJECT_ID/distiller-bot:$GITHUB_SHA \
+            --region $REGION \
+            --memory 512Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 2 \
+            --allow-unauthenticated \
+            --set-env-vars GCS_BUCKET=distiller-data \
+            --set-secrets LINE_CHANNEL_ID=LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=LINE_CHANNEL_SECRET:latest,LINE_USER_ID=LINE_USER_ID:latest
