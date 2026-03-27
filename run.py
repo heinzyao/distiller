@@ -298,12 +298,18 @@ def main():
         print(f"☁️  從 GCS 下載 DB ({gcs_bucket}/{gcs_db_blob})…")
         gcs_storage.download_db(gcs_bucket, gcs_db_blob, args.db_path)
 
-    if args.mode == "test":
-        success, stats = run_test(args.output, args.db_path, args)
-    elif args.mode == "medium":
-        success, stats = run_medium(args.output, args.db_path, args)
-    else:
-        success, stats = run_full(args.output, args.db_path, args)
+    _exc: Exception | None = None
+    try:
+        if args.mode == "test":
+            success, stats = run_test(args.output, args.db_path, args)
+        elif args.mode == "medium":
+            success, stats = run_medium(args.output, args.db_path, args)
+        else:
+            success, stats = run_full(args.output, args.db_path, args)
+    except Exception as e:
+        _exc = e
+        success, stats = False, {}
+        logger.exception("爬蟲執行發生例外")
 
     duration_secs = int(time.time() - _run_start)
     print(f"\n結束時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -328,7 +334,11 @@ def main():
                     return notifier.notify_success(
                         args.mode, clean_stats, duration_secs=duration_secs
                     )
-                return notifier.notify_failure(args.mode, duration_secs=duration_secs)
+                return notifier.notify_failure(
+                    args.mode,
+                    error=str(_exc) if _exc else "",
+                    duration_secs=duration_secs,
+                )
 
             ok = _do_notify()
             if not ok:
@@ -352,6 +362,8 @@ def main():
         print(f"\n☁️  上傳 DB 至 GCS ({gcs_bucket}/{gcs_db_blob})…")
         gcs_storage.upload_db(gcs_bucket, gcs_db_blob, args.db_path)
 
+    if _exc is not None:
+        raise _exc
     if success:
         print("\n✅ 爬蟲執行成功！")
     else:
