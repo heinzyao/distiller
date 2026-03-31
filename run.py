@@ -205,13 +205,13 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
     )
 
     _full_categories = [
+        "liqueurs-bitters",
         "whiskey",
         "gin",
         "rum",
         "vodka",
         "brandy",
         "tequila-mezcal",
-        "liqueurs-bitters",
     ]
     run_id = None
     if isinstance(storage, SQLiteStorage):

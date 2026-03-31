@@ -528,6 +528,107 @@ def fmt_run_status() -> str:
     return "💤 目前無爬蟲執行中"
 
 
+def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None) -> str:
+    """雞尾酒多成分推薦，整合 CocktailRecommender。"""
+    from distiller_scraper.cocktail_db import get_cocktail, list_cocktails
+    from distiller_scraper.recommender import CocktailRecommender, format_recommendation
+
+    cocktail = get_cocktail(cocktail_query)
+    # 若查無結果且有偏好文字，嘗試將「酒名 + 偏好文字」合起來當酒名
+    # 處理如 "cocktail Old Fashioned" 被拆成 name="Old", pref="Fashioned" 的情況
+    if cocktail is None and pref_text:
+        full_name = f"{cocktail_query} {pref_text}"
+        cocktail = get_cocktail(full_name)
+        if cocktail is not None:
+            cocktail_query = full_name
+            pref_text = None
+
+    if cocktail is None:
+        supported = "、".join(list_cocktails())
+        return (
+            f"❓ 找不到「{cocktail_query}」的配方。\n\n"
+            f"目前支援：\n{supported}\n\n"
+            "傳送「雞尾酒 清單」查看完整列表。"
+        )
+
+    # 解析偏好文字為風味向量（簡單關鍵字對應）
+    user_flavor_prefs = _parse_flavor_prefs(pref_text) if pref_text else None
+
+    with CocktailRecommender(db_path) as rec:
+        result = rec.recommend(
+            cocktail_query,
+            user_flavor_prefs=user_flavor_prefs,
+            top_k=3,
+        )
+
+    if result is None:
+        return "⚠️ 推薦時發生錯誤，請稍後再試。"
+
+    text = format_recommendation(result)
+
+    if pref_text:
+        text += f"\n\n💬 根據您的偏好「{pref_text}」調整排序"
+
+    return text
+
+
+def _parse_flavor_prefs(pref_text: str) -> dict[str, float] | None:
+    """將自然語言偏好文字轉換為風味向量（關鍵字比對）。"""
+    _KEYWORD_MAP: dict[str, dict[str, float]] = {
+        "煙燻": {"smoky": 80, "peaty": 60},
+        "泥煤": {"peaty": 85, "smoky": 70, "earthy": 50},
+        "花香": {"floral": 80, "fruity": 50},
+        "果香": {"fruity": 80, "floral": 40, "sweet": 50},
+        "草本": {"herbal": 80, "juniper": 60},
+        "辛香": {"spicy": 80, "herbal": 50},
+        "甜": {"sweet": 75, "vanilla": 55},
+        "不甜": {"sweet": 10, "tart": 40},
+        "苦": {"bitter": 75, "herbal": 50},
+        "濃郁": {"rich": 80, "full_bodied": 70, "sweet": 50},
+        "清爽": {"tart": 50, "floral": 55, "sweet": 25, "rich": 20},
+        "柑橘": {"fruity": 70, "tart": 60, "floral": 40},
+        "香草": {"vanilla": 80, "sweet": 60, "rich": 50},
+        "木質": {"woody": 75, "earthy": 50, "rich": 55},
+        "咖啡": {"rich": 70, "bitter": 60, "roast": 65},
+        "海鹽": {"salty": 70, "briny": 60},
+        "輕盈": {"floral": 60, "fruity": 50, "rich": 20, "full_bodied": 25},
+        "重口": {"rich": 80, "full_bodied": 80, "spicy": 60},
+        "juniper": {"juniper": 85},
+        "smoky": {"smoky": 80},
+        "peaty": {"peaty": 85},
+        "floral": {"floral": 80},
+        "herbal": {"herbal": 80},
+        "fruity": {"fruity": 80},
+        "sweet": {"sweet": 75},
+        "spicy": {"spicy": 80},
+    }
+
+    merged: dict[str, float] = {}
+    pref_lower = pref_text.lower()
+    for keyword, flavors in _KEYWORD_MAP.items():
+        if keyword in pref_lower:
+            for k, v in flavors.items():
+                merged[k] = max(merged.get(k, 0.0), v)
+
+    return merged if merged else None
+
+
+def fmt_cocktail_list() -> str:
+    """列出所有支援的雞尾酒。"""
+    from distiller_scraper.cocktail_db import COCKTAIL_DB
+
+    lines = ["🍹 支援的經典雞尾酒", _SEP, ""]
+    for cocktail in COCKTAIL_DB.values():
+        aliases = "、".join(cocktail.get("aliases", []))
+        alias_str = f"（{aliases}）" if aliases else ""
+        lines.append(f"• {cocktail['name']}{alias_str}")
+        lines.append(f"  {cocktail['flavor_style']} — {cocktail['description'][:30]}…")
+    lines.append("")
+    lines.append("用法：雞尾酒 <酒名> [偏好描述]")
+    lines.append("例：雞尾酒 Negroni 我喜歡苦味草本")
+    return "\n".join(lines)
+
+
 def fmt_help() -> str:
     return "\n".join(
         [
@@ -549,6 +650,13 @@ def fmt_help() -> str:
             "風味 [名稱]  維度排行",
             "  例：風味 smoky",
             "",
+            "",
+            "🍹 雞尾酒推薦",
+            "雞尾酒 <酒名> [偏好]",
+            "  依雞尾酒推薦基酒與利口酒",
+            "  例：雞尾酒 Negroni",
+            "  例：雞尾酒 Martini 喜歡花香清爽",
+            "  例：雞尾酒 清單  列出支援酒款",
             "",
             "🤖 爬蟲指令（僅授權使用者）",
             "執行 test / medium / full",
@@ -606,6 +714,20 @@ def parse_command(text: str) -> tuple[str, list[str | int | None]]:
             score = int(country)
             country = None
         return "list", [country, score]
+
+    # 雞尾酒推薦（支援：雞尾酒 <酒名>、雞尾酒 <酒名> <偏好>、調酒 <酒名>）
+    m = re.match(r"^(雞尾酒|調酒|cocktail)\s+(清單|list)$", text, re.IGNORECASE)
+    if m:
+        return "cocktail_list", []
+
+    m = re.match(r"^(雞尾酒|調酒|cocktail)\s+(.+)$", text, re.IGNORECASE)
+    if m:
+        rest = m.group(2).strip()
+        # 嘗試拆分「酒名 偏好描述」：偏好以空白隔開，兩字以上才算偏好
+        parts = rest.split(None, 1)
+        cocktail_name = parts[0]
+        pref_text = parts[1] if len(parts) > 1 else None
+        return "cocktail", [cocktail_name, pref_text]
 
     # 執行爬蟲
     m = re.match(r"^(執行|run)\s+(test|medium|full)$", text, re.IGNORECASE)
@@ -724,6 +846,12 @@ def _handle(text: str, db_path: str, user_id: str | None = None) -> str:
             else:
                 min_score = None
             return fmt_list(db_path, country, min_score)
+        elif command == "cocktail":
+            cocktail_name = str(args[0]) if args[0] else ""
+            pref_text = str(args[1]) if len(args) > 1 and args[1] else None
+            return fmt_cocktail(db_path, cocktail_name, pref_text)
+        elif command == "cocktail_list":
+            return fmt_cocktail_list()
         elif command == "run_status":
             return fmt_run_status()
         elif command == "run_scrape":
