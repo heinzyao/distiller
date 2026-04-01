@@ -54,11 +54,11 @@ jobs:
           || gcloud run jobs create distiller-scraper \
             --image gcr.io/$PROJECT_ID/distiller-scraper:$GITHUB_SHA \
             --region $REGION \
-            --memory 2Gi \
+            --memory 4Gi \
             --cpu 2 \
             --task-timeout 3600 \
             --set-env-vars GCS_BUCKET=distiller-data \
-            --set-secrets LINE_CHANNEL_ID=LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=LINE_CHANNEL_SECRET:latest,LINE_USER_ID=LINE_USER_ID:latest
+            --set-secrets LINE_CHANNEL_ID=DISTILLER_LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=DISTILLER_LINE_CHANNEL_SECRET:latest,LINE_USER_ID=DISTILLER_LINE_USER_ID:latest
 
       # ── Bot 容器 ───────────────────────────────────────────────
       - name: Build bot image
@@ -83,4 +83,4 @@ jobs:
             --max-instances 2 \
             --allow-unauthenticated \
             --set-env-vars GCS_BUCKET=distiller-data \
-            --set-secrets LINE_CHANNEL_ID=LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=LINE_CHANNEL_SECRET:latest,LINE_USER_ID=LINE_USER_ID:latest
+            --set-secrets LINE_CHANNEL_ID=DISTILLER_LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=DISTILLER_LINE_CHANNEL_SECRET:latest,LINE_USER_ID=DISTILLER_LINE_USER_ID:latest
