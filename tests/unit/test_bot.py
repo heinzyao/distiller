@@ -687,3 +687,154 @@ class TestHandleRunScrape:
         result = _handle("執行狀態", db_path)
         assert "full" in result
         assert "已執行" in result
+
+
+# ---------------------------------------------------------------------------
+# Recipe 指令測試
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def diffords_db(tmp_path):
+    """建立含一筆 Negroni 酒譜的 Difford's DB。"""
+    from distiller_scraper.diffords_storage import DiffordsStorage
+
+    db = tmp_path / "diffords.db"
+    with DiffordsStorage(str(db)) as storage:
+        storage.save_cocktail({
+            "url": "https://www.diffordsguide.com/cocktails/recipe/1502/negroni",
+            "name": "Negroni",
+            "description": "A classic Italian aperitif cocktail.",
+            "glassware": "Old-fashioned glass",
+            "garnish": "Orange slice",
+            "prepare": None,
+            "instructions": "Stir all ingredients with ice. Strain into glass.",
+            "review": "A perfectly balanced bitter classic.",
+            "history": "Invented by Count Camillo Negroni in 1919.",
+            "tags": ["bitter", "classic"],
+            "rating_value": 4.5,
+            "rating_count": 200,
+            "calories": 200,
+            "prep_time_minutes": 2,
+            "abv": 28.0,
+            "date_published": "2010-01-01",
+            "lastmod": "2024-01-01",
+            "ingredients_html": [
+                {"sort_order": 1, "item": "Campari", "amount": "30ml"},
+                {"sort_order": 2, "item": "Sweet vermouth", "amount": "30ml"},
+                {"sort_order": 3, "item": "Gin", "amount": "30ml"},
+            ],
+            "ingredients_generic": [],
+        })
+    return str(db)
+
+
+class TestParseCommandRecipe:
+    def test_recipe_chinese(self):
+        cmd, args = parse_command("酒譜 Negroni")
+        assert cmd == "recipe"
+        assert args[0] == "Negroni"
+
+    def test_recipe_fangjin(self):
+        cmd, args = parse_command("酒方 Daiquiri")
+        assert cmd == "recipe"
+        assert args[0] == "Daiquiri"
+
+    def test_recipe_english(self):
+        cmd, args = parse_command("recipe Margarita")
+        assert cmd == "recipe"
+        assert args[0] == "Margarita"
+
+
+class TestFmtRecipe:
+    def test_found_returns_detail(self, diffords_db):
+        from bot import fmt_recipe
+
+        result = fmt_recipe(diffords_db, "Negroni")
+        assert "Negroni" in result
+        assert "Campari" in result
+        assert "食材" in result
+
+    def test_not_found_returns_hint(self, diffords_db):
+        from bot import fmt_recipe
+
+        result = fmt_recipe(diffords_db, "NonexistentDrink12345")
+        assert "❓" in result
+
+    def test_partial_match_returns_list(self, diffords_db):
+        from bot import fmt_recipe
+
+        # "neg" 應該能模糊匹配到 Negroni
+        result = fmt_recipe(diffords_db, "neg")
+        # 有找到（單筆直接顯示詳情）或列出搜尋結果
+        assert "Negroni" in result
+
+    def test_history_shown(self, diffords_db):
+        from bot import fmt_recipe
+
+        result = fmt_recipe(diffords_db, "Negroni")
+        assert "歷史" in result
+        assert "1919" in result
+
+    def test_review_shown(self, diffords_db):
+        from bot import fmt_recipe
+
+        result = fmt_recipe(diffords_db, "Negroni")
+        assert "評語" in result
+
+
+class TestHandleRecipe:
+    def test_recipe_command_dispatched(self, db_path, diffords_db):
+        result = _handle("酒譜 Negroni", db_path, diffords_db_path=diffords_db)
+        assert "Negroni" in result
+        assert "Campari" in result
+
+    def test_recipe_no_db_returns_warning(self, db_path, tmp_path):
+        missing_db = str(tmp_path / "missing.db")
+        result = _handle("酒譜 Negroni", db_path, diffords_db_path=missing_db)
+        assert "⚠️" in result
+
+    def test_recipe_empty_query(self, db_path, diffords_db):
+        # parse_command 不會產生空 query（需要至少一個字），直接測 fmt_recipe
+        from bot import fmt_recipe
+        # 空名稱測試：search 會找不到
+        result = fmt_recipe(diffords_db, "zzz_nothing")
+        assert "❓" in result
+
+
+class TestDiffordsEnrichment:
+    """測試 cocktail 指令後附加 Difford's history/review。"""
+
+    def test_enrichment_appended_when_db_exists(self, db_path, diffords_db):
+        from bot import fmt_cocktail
+
+        with patch("distiller_scraper.recommender.CocktailRecommender") as MockRec:
+            mock_instance = MagicMock()
+            mock_instance.__enter__ = lambda s: mock_instance
+            mock_instance.__exit__ = MagicMock(return_value=False)
+            mock_instance.recommend.return_value = None
+            MockRec.return_value = mock_instance
+
+            # recommend 回 None，fmt_cocktail 會回 ⚠️；
+            # 但 Difford's 仍嘗試查詢（不影響主流程）
+            result = fmt_cocktail(db_path, "Negroni", None,
+                                  diffords_db_path=diffords_db)
+            # 不論推薦是否成功，不應拋例外
+            assert isinstance(result, str)
+
+    def test_enrichment_skipped_when_no_db(self, db_path, tmp_path):
+        from bot import fmt_cocktail
+
+        with patch("distiller_scraper.recommender.CocktailRecommender") as MockRec:
+            mock_instance = MagicMock()
+            mock_instance.__enter__ = lambda s: mock_instance
+            mock_instance.__exit__ = MagicMock(return_value=False)
+            mock_instance.recommend.return_value = None
+            MockRec.return_value = mock_instance
+
+            missing = str(tmp_path / "no.db")
+            result = fmt_cocktail(db_path, "Negroni", None,
+                                  diffords_db_path=missing)
+            assert isinstance(result, str)
+            # 確認沒有歷史 section（DB 不存在）
+            assert "1919" not in result

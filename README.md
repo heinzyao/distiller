@@ -17,8 +17,10 @@ A Python web scraper project designed to extract liquor reviews and spirit profi
 - Automatic API endpoint discovery, significantly boosting scraping speed.
 - Multiple storage backends: CSV / SQLite / Both combined.
 - **Cocktail Recommender**: multi-ingredient spirit recommendations for 23 classic cocktails with flavor-vector scoring.
+- **Difford's Guide Scraper**: lightweight scraper (requests + BeautifulSoup, no Chrome) for cocktail recipes from diffordsguide.com — sitemap-driven incremental updates.
+- **`recipe` Bot Command**: query full cocktail recipes (ingredients, instructions, history, review) from the Difford's Guide database.
 - **Claude API Integration**: optional AI-generated sommelier-style explanations for top recommendations.
-- 402 automated tests with GitHub Actions CI/CD pipelines.
+- 450 automated tests with GitHub Actions CI/CD pipelines.
 
 ### Project Structure
 
@@ -29,10 +31,20 @@ distiller/
 │   ├── selectors.py           # CSS Selectors & SearchURLBuilder
 │   ├── config.py              # Configuration (constants, pagination logic)
 │   ├── storage.py             # Storage Backends (SQLiteStorage, CSVStorage)
-│   └── api_client.py          # API Endpoint Discovery Client
+│   ├── api_client.py          # API Endpoint Discovery Client
+│   ├── diffords_scraper.py    # Difford's Guide Scraper (requests + BeautifulSoup)
+│   ├── diffords_selectors.py  # HTML / JSON-LD Extractor for Difford's Guide
+│   ├── diffords_storage.py    # SQLite Storage for Difford's cocktail recipes
+│   ├── cocktail_db.py         # 23 Classic Cocktails Knowledge Base
+│   └── recommender.py         # CocktailRecommender (flavor-vector scoring)
 ├── data/                      # Centralized CSV Outputs (Auto-generated)
 ├── bot.py                     # LINE Bot (Flask webhook, port 8000)
+├── run.py                     # Distiller.com Scraper Entry Point
+├── run_diffords.py            # Difford's Guide Scraper Entry Point
 ├── query.py                   # CLI Query Tool
+├── Dockerfile.scraper         # Scraper container (Chrome + Selenium)
+├── Dockerfile.diffords        # Difford's scraper container (lightweight, ~200 MB)
+├── Dockerfile.bot             # LINE Bot container
 ├── scripts/
 │   ├── run_scraper.sh         # Scheduled Scraping Script
 │   └── run_bot.sh             # LINE Bot Launch Script (used for launchd)
@@ -107,7 +119,22 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `cocktail`, `help`
+Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `cocktail`, `recipe` / `酒譜`, `help`
+
+#### Difford's Guide Scraper
+
+Scrapes cocktail recipes from [diffordsguide.com](https://www.diffordsguide.com) without Chrome (requests + BeautifulSoup).
+
+```bash
+# Incremental update (sitemap lastmod comparison)
+python run_diffords.py --mode incremental
+
+# Full scrape
+python run_diffords.py --mode full
+
+# Test run (10 recipes)
+python run_diffords.py --mode test
+```
 
 ### Testing
 
@@ -230,8 +257,10 @@ MIT
 - API 端點自動探索，大幅提升爬取速度
 - 多儲存後端：CSV / SQLite / 雙輸出
 - **雞尾酒推薦引擎**：23 款經典雞尾酒多成分推薦，風味向量評分
+- **Difford's Guide 爬蟲**：輕量爬蟲（requests + BeautifulSoup，無需 Chrome），從 diffordsguide.com 爬取雞尾酒酒譜，Sitemap 驅動增量更新
+- **`酒譜` Bot 指令**：查詢 Difford's Guide 資料庫的完整酒譜（食材、作法、歷史、評語）
 - **Claude API 整合**：可選的 AI 品酒師口吻個人化說明
-- 402 個自動化測試，GitHub Actions CI/CD
+- 450 個自動化測試，GitHub Actions CI/CD
 
 ### 專案結構
 
@@ -242,10 +271,20 @@ distiller/
 │   ├── selectors.py           # CSS 選擇器 & SearchURLBuilder
 │   ├── config.py              # 爬蟲配置（含分頁常數）
 │   ├── storage.py             # 儲存後端 (SQLiteStorage, CSVStorage)
-│   └── api_client.py          # API 端點探索客戶端
+│   ├── api_client.py          # API 端點探索客戶端
+│   ├── diffords_scraper.py    # Difford's Guide 爬蟲（requests + BeautifulSoup）
+│   ├── diffords_selectors.py  # Difford's HTML / JSON-LD 資料擷取器
+│   ├── diffords_storage.py    # Difford's 雞尾酒酒譜 SQLite 儲存層
+│   ├── cocktail_db.py         # 23 款經典雞尾酒知識庫
+│   └── recommender.py         # 雞尾酒推薦引擎（風味向量評分）
 ├── data/                      # CSV 輸出集中處（自動建立）
 ├── bot.py                     # LINE Bot（Flask webhook，port 8000）
+├── run.py                     # Distiller.com 爬蟲進入點
+├── run_diffords.py            # Difford's Guide 爬蟲進入點
 ├── query.py                   # CLI 查詢工具
+├── Dockerfile.scraper         # 爬蟲容器（Chrome + Selenium，~800 MB）
+├── Dockerfile.diffords        # Difford's 爬蟲容器（輕量，~200 MB）
+├── Dockerfile.bot             # LINE Bot 容器
 ├── scripts/
 │   ├── run_scraper.sh         # 排程爬取腳本
 │   └── run_bot.sh             # Bot 啟動腳本（launchd 用）
@@ -320,7 +359,22 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`雞尾酒`、`說明`
+支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`雞尾酒`、`酒譜`、`說明`
+
+#### Difford's Guide 爬蟲
+
+從 [diffordsguide.com](https://www.diffordsguide.com) 爬取雞尾酒酒譜，不需要 Chrome（requests + BeautifulSoup）。
+
+```bash
+# 增量更新（比對 sitemap lastmod，預設模式）
+python run_diffords.py --mode incremental
+
+# 全量爬取
+python run_diffords.py --mode full
+
+# 測試模式（僅爬 10 筆）
+python run_diffords.py --mode test
+```
 
 ### 測試
 

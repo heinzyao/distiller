@@ -311,9 +311,16 @@ class DiffordsStorage:
         return self._attach_ingredients(dict(row))
 
     def get_cocktail_by_name(self, name: str) -> Optional[dict]:
+        """精確比對（大小寫不分），若無結果則回退至部分比對。"""
         row = self.conn.execute(
             "SELECT * FROM cocktails WHERE LOWER(name) = LOWER(?) LIMIT 1", (name,)
         ).fetchone()
+        if not row:
+            # fuzzy fallback：名稱包含 query，或 query 包含名稱
+            row = self.conn.execute(
+                "SELECT * FROM cocktails WHERE LOWER(name) LIKE LOWER(?) LIMIT 1",
+                (f"%{name}%",),
+            ).fetchone()
         if not row:
             return None
         return self._attach_ingredients(dict(row))
@@ -354,3 +361,10 @@ class DiffordsStorage:
 
     def close(self):
         self.conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
