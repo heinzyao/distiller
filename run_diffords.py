@@ -27,6 +27,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from distiller_scraper.diffords_config import (
+    DUPLICATE_RUN_WINDOW_HOURS,
+    DIFFORDS_NOTIFY_SOURCE,
+)
 from distiller_scraper.diffords_scraper import DiffordsGuideScraper
 from distiller_scraper.diffords_storage import DiffordsStorage
 from distiller_scraper.notify import LineNotifier
@@ -41,33 +45,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Difford's 爬取視窗：7 天（酒譜更新頻率遠低於烈酒資料）
-DUPLICATE_RUN_WINDOW_HOURS = 168
 
-_NOTIFY_SOURCE = "Difford's Guide"
-
-
-def _do_notify(notifier: LineNotifier, success: bool, skipped: bool,
-               mode: str, stats: dict, exc, duration_secs: int,
-               last_run_at: str = "") -> bool:
+def _do_notify(
+    notifier: LineNotifier,
+    success: bool,
+    skipped: bool,
+    mode: str,
+    stats: dict,
+    exc,
+    duration_secs: int,
+    last_run_at: str = "",
+) -> bool:
     if skipped:
-        return notifier.notify_skipped(mode, last_run_at, source=_NOTIFY_SOURCE)
+        return notifier.notify_skipped(mode, last_run_at, source=DIFFORDS_NOTIFY_SOURCE)
     if success:
         clean_stats = {k: v for k, v in stats.items() if not k.startswith("_")}
         return notifier.notify_success(
-            mode, clean_stats, duration_secs=duration_secs, source=_NOTIFY_SOURCE
+            mode,
+            clean_stats,
+            duration_secs=duration_secs,
+            source=DIFFORDS_NOTIFY_SOURCE,
         )
     return notifier.notify_failure(
         mode,
         error=str(exc) if exc else "未知錯誤",
         duration_secs=duration_secs,
-        source=_NOTIFY_SOURCE,
+        source=DIFFORDS_NOTIFY_SOURCE,
     )
 
 
 def run(mode: str, db_path: str, notify_line: bool, args) -> tuple[bool, dict]:
     """核心執行流程，回傳 (success, stats)。"""
-    incremental = (mode != "full")
+    incremental = mode != "full"
     max_recipes = 10 if mode == "test" else None
 
     storage = DiffordsStorage(db_path)
@@ -76,7 +85,9 @@ def run(mode: str, db_path: str, notify_line: bool, args) -> tuple[bool, dict]:
     if mode != "test":
         should_skip, last_run_at = storage.should_skip_run(DUPLICATE_RUN_WINDOW_HOURS)
         if should_skip:
-            logger.info("⏭️  %d 小時內已有成功執行紀錄，跳過", DUPLICATE_RUN_WINDOW_HOURS)
+            logger.info(
+                "⏭️  %d 小時內已有成功執行紀錄，跳過", DUPLICATE_RUN_WINDOW_HOURS
+            )
             storage.close()
             return True, {"_skipped": True, "_last_run_at": last_run_at}
 
@@ -144,6 +155,7 @@ def main():
     gcs_db_blob = os.getenv("GCS_DB_BLOB", "diffords.db")
     if gcs_bucket:
         from distiller_scraper import gcs_storage
+
         print(f"☁️  從 GCS 下載 DB ({gcs_bucket}/{gcs_db_blob})…")
         gcs_storage.download_db(gcs_bucket, gcs_db_blob, args.db_path)
 
@@ -161,6 +173,7 @@ def main():
     # ── GCS 上傳 ─────────────────────────────────────────────────────
     if gcs_bucket:
         from distiller_scraper import gcs_storage
+
         print(f"\n☁️  上傳 DB 至 GCS ({gcs_bucket}/{gcs_db_blob})…")
         gcs_storage.upload_db(gcs_bucket, gcs_db_blob, args.db_path)
 
@@ -171,11 +184,19 @@ def main():
         if not notifier.is_configured():
             print("⚠️  LINE 通知未設定（缺少憑證環境變數）")
         else:
+
             def _notify():
                 return _do_notify(
-                    notifier, success, skipped, args.mode, stats, _exc,
-                    duration_secs, stats.get("_last_run_at", "")
+                    notifier,
+                    success,
+                    skipped,
+                    args.mode,
+                    stats,
+                    _exc,
+                    duration_secs,
+                    stats.get("_last_run_at", ""),
                 )
+
             ok = _notify()
             if not ok:
                 print("⚠️  LINE 通知第一次失敗，30 秒後重試…")

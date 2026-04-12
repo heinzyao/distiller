@@ -49,18 +49,18 @@ _ = load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from distiller_scraper.diffords_config import DIFFORDS_DB_DEFAULT, GCS_DIFFORDS_DB_BLOB
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 # GCS 設定：設定 GCS_BUCKET 時啟用雲端模式，否則維持本機行為
 GCS_BUCKET = os.getenv("GCS_BUCKET", "")
 GCS_DB_BLOB = os.getenv("GCS_DB_BLOB", "distiller.db")
-GCS_DIFFORDS_DB_BLOB = os.getenv("GCS_DIFFORDS_DB_BLOB", "diffords.db")
 
 LINE_TOKEN_URL = "https://api.line.me/v2/oauth/accessToken"
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 DB_DEFAULT = "distiller.db"
-DIFFORDS_DB_DEFAULT = "diffords.db"
 MSG_LIMIT = 4900  # LINE 單則訊息字元上限（官方上限 5000，保留 100 字元緩衝）
 
 # 視覺元素：統一的分隔線與獎牌圖示，讓 LINE 訊息格式一致且易讀
@@ -348,11 +348,16 @@ def fmt_info(db_path: str, name: str) -> str:
     # 依類型決定圖示
     s_type = (row.get("spirit_type") or "").lower()
     icon = "🥃"
-    if "gin" in s_type: icon = "🧊"
-    elif "vodka" in s_type: icon = "❄️"
-    elif "rum" in s_type: icon = "🏴‍☠️"
-    elif "tequila" in s_type: icon = "🌵"
-    elif "brandy" in s_type or "cognac" in s_type: icon = "🍷"
+    if "gin" in s_type:
+        icon = "🧊"
+    elif "vodka" in s_type:
+        icon = "❄️"
+    elif "rum" in s_type:
+        icon = "🏴‍☠️"
+    elif "tequila" in s_type:
+        icon = "🌵"
+    elif "brandy" in s_type or "cognac" in s_type:
+        icon = "🍷"
 
     lines: list[str] = [
         f"{icon} {row['name']}",
@@ -534,7 +539,6 @@ def fmt_list(
     return "\n".join(lines)
 
 
-
 def fmt_run_status() -> str:
     """回傳爬蟲目前執行狀態。"""
     with _scrape_lock:
@@ -647,6 +651,52 @@ def _fmt_recipe_detail(c: dict) -> str:
     return "\n".join(lines)
 
 
+def fmt_cocktail_top(diffords_db_path: str, n: int = 10) -> str:
+    if not Path(diffords_db_path).exists():
+        return "⚠️ Difford's Guide 資料庫尚未建立。\n請先執行 Difford's 爬蟲：\nuv run python run_diffords.py --mode test"
+    from distiller_scraper.diffords_storage import DiffordsStorage
+
+    with DiffordsStorage(diffords_db_path) as storage:
+        results = storage.get_top_rated(limit=n)
+    if not results:
+        return "📭 Difford's 資料庫目前沒有評分資料。"
+    lines: list[str] = [f"🍸 Difford's 評分榜 Top {n}", _SEP]
+    for i, r in enumerate(results, 1):
+        rank = _MEDALS.get(i, f"{i:>2}.")
+        lines.append(f"{rank} {r['name']}")
+        if r.get("rating_value"):
+            rating_str = f"   ⭐ {r['rating_value']:.1f}/5"
+            if r.get("rating_count"):
+                rating_str += f"（{r['rating_count']} 評）"
+        else:
+            rating_str = "   （暫無評分）"
+        lines.append(rating_str)
+        lines.append("")
+    lines.append("💡 傳送『調酒詳情 <名稱>』查看完整酒譜")
+    return "\n".join(lines)
+
+
+def fmt_cocktail_search(diffords_db_path: str, keyword: str) -> str:
+    if not Path(diffords_db_path).exists():
+        return "⚠️ Difford's Guide 資料庫尚未建立。\n請先執行 Difford's 爬蟲：\nuv run python run_diffords.py --mode test"
+    from distiller_scraper.diffords_storage import DiffordsStorage
+
+    with DiffordsStorage(diffords_db_path) as storage:
+        results = storage.search_cocktails(keyword)
+    if not results:
+        return f"❓ 找不到含有「{keyword}」的調酒，請嘗試縮短關鍵字。"
+    lines: list[str] = [f"🔍 搜尋「{keyword}」：{len(results)} 筆", _SEP_LIGHT]
+    for r in results:
+        lines.append(f"・{r['name']}")
+        if r.get("rating_value"):
+            lines.append(f"  ⭐ {r['rating_value']:.1f}/5")
+        if r.get("description"):
+            lines.append(f"  {_truncate(r['description'], 100)}")
+        lines.append("")
+    lines.append("💡 傳送『調酒詳情 <名稱>』查看完整酒譜")
+    return "\n".join(lines)
+
+
 def _get_diffords_reference(diffords_db_path: str | None, cocktail_name: str) -> str:
     """從 Difford's DB 取得補充資訊（history/review）。若無 DB 或無資料則回傳空字串。"""
     if not diffords_db_path or not Path(diffords_db_path).exists():
@@ -669,6 +719,73 @@ def _get_diffords_reference(diffords_db_path: str | None, cocktail_name: str) ->
     except Exception as e:
         logger.debug("Difford's 參考資料查詢失敗：%s", e)
         return ""
+
+
+_DIFFORDS_DB_MISSING = (
+    "⚠️ Difford's Guide 資料庫尚未建立。\n"
+    "請先執行 Difford's 爬蟲：\n"
+    "uv run python run_diffords.py --mode test"
+)
+
+
+def fmt_cocktail_info(diffords_db_path: str, name: str) -> str:
+    if not Path(diffords_db_path).exists():
+        return _DIFFORDS_DB_MISSING
+    from distiller_scraper.diffords_storage import DiffordsStorage
+
+    with DiffordsStorage(diffords_db_path) as storage:
+        cocktail = storage.get_cocktail_by_name(name)
+        if not cocktail:
+            results = storage.search_cocktails(name, limit=5)
+            if not results:
+                return f"❓ 找不到「{name}」的調酒。\n試試『調酒搜尋 <關鍵字>』"
+            if len(results) == 1:
+                cocktail = storage._attach_ingredients(results[0])
+            else:
+                lines = [f"🔎 找到 {len(results)} 筆相關調酒：", _SEP_LIGHT]
+                for r in results:
+                    rating = (
+                        f" ⭐{r['rating_value']:.1f}" if r.get("rating_value") else ""
+                    )
+                    lines.append(f"• {r['name']}{rating}")
+                return "\n".join(lines)
+    return _fmt_recipe_detail(cocktail)
+
+
+def fmt_cocktail_stats(diffords_db_path: str) -> str:
+    if not Path(diffords_db_path).exists():
+        return _DIFFORDS_DB_MISSING
+    import sqlite3 as _sqlite3
+
+    from distiller_scraper.diffords_storage import DiffordsStorage
+
+    with DiffordsStorage(diffords_db_path) as storage:
+        stats = storage.get_stats()
+
+    with _sqlite3.connect(diffords_db_path) as conn:
+        rows = conn.execute(
+            "SELECT item_generic, COUNT(*) c FROM cocktail_ingredients "
+            "WHERE item_generic IS NOT NULL GROUP BY item_generic ORDER BY c DESC LIMIT 5"
+        ).fetchall()
+
+    total = stats["總雞尾酒數"]
+    avg_rating = stats["平均評分"]
+    last_scrape = stats["最後爬取"]
+    avg_str = f"{avg_rating:.1f}" if avg_rating is not None else "—"
+
+    lines: list[str] = [
+        "📊 Difford's Guide 數據概覽",
+        _SEP,
+        f"🍸 總調酒數　{total} 筆",
+        f"⭐ 平均評分　{avg_str}/5",
+        f"🕐 最後爬取　{last_scrape or '尚未爬取'}",
+        "",
+        "📋 最常見材料 Top 5",
+        _SEP_LIGHT,
+    ]
+    for ingredient, count in rows:
+        lines.append(f"  {ingredient:<15} {count:>4} 次")
+    return "\n".join(lines)
 
 
 def fmt_cocktail(
@@ -766,8 +883,7 @@ def fmt_cocktail(
     return text
 
 
-def fmt_cocktail_list() -> str:
-    """列出所有支援的雞尾酒。"""
+def _fmt_cocktail_recommend_list() -> str:
     from distiller_scraper.cocktail_db import COCKTAIL_DB
 
     lines = ["🍹 支援的經典雞尾酒", _SEP, ""]
@@ -779,6 +895,96 @@ def fmt_cocktail_list() -> str:
     lines.append("")
     lines.append("用法：雞尾酒 <酒名> [偏好描述]")
     lines.append("例：雞尾酒 Negroni 我喜歡苦味草本")
+    return "\n".join(lines)
+
+
+def fmt_cocktail_list(
+    diffords_db_path: str,
+    filter_type: str | None = None,
+    filter_value: str | None = None,
+) -> str:
+    if not Path(diffords_db_path).exists():
+        return (
+            "⚠️ Difford's Guide 資料庫尚未建立。\n"
+            "請先執行 Difford's 爬蟲：\n"
+            "uv run python run_diffords.py --mode test"
+        )
+    from distiller_scraper.diffords_storage import DiffordsStorage
+
+    with DiffordsStorage(diffords_db_path) as storage:
+        if filter_type == "ingredient":
+            results = storage.filter_by_ingredient(filter_value, limit=20)
+        elif filter_type == "tag":
+            results = storage.filter_by_tag(filter_value, limit=20)
+        elif filter_type == "rating":
+            results = storage.filter_by_rating(min_rating=float(filter_value), limit=20)
+        else:
+            results = storage.get_top_rated(limit=20)
+
+    if not results:
+        return "📭 沒有符合條件的調酒。"
+
+    if filter_type is None:
+        header = "🍸 Difford's 調酒列表 Top 20"
+    else:
+        header = f"🍸 {filter_type}: {filter_value} 調酒列表"
+
+    lines: list[str] = [header, _SEP, ""]
+    for i, r in enumerate(results, 1):
+        lines.append(f"{i}. {r['name']}")
+        if r.get("rating_value"):
+            lines.append(f"   ⭐ {r['rating_value']:.1f}/5")
+        else:
+            lines.append("   （暫無評分）")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def fmt_cocktail_makeable(diffords_db_path: str, distiller_db_path: str) -> str:
+    if not Path(diffords_db_path).exists():
+        return (
+            "⚠️ Difford's Guide 資料庫尚未建立。\n"
+            "請先執行 Difford's 爬蟲：\n"
+            "uv run python run_diffords.py --mode test"
+        )
+    if not Path(distiller_db_path).exists():
+        return (
+            "⚠️ Distiller 資料庫不存在，請先執行爬蟲："
+            "uv run python run.py --mode test --output sqlite"
+        )
+    from distiller_scraper.diffords_storage import (
+        DiffordsStorage,
+        get_user_spirit_types,
+        load_ingredient_mapping,
+    )
+
+    user_spirit_types = get_user_spirit_types(distiller_db_path)
+    mapping = load_ingredient_mapping()
+
+    with DiffordsStorage(diffords_db_path) as storage:
+        results = storage.get_makeable_cocktails(user_spirit_types, mapping)
+
+    if not results:
+        spirit_preview = ", ".join(user_spirit_types[:5])
+        if len(user_spirit_types) > 5:
+            spirit_preview += "..."
+        return (
+            f"🍸 根據您收藏的 {len(user_spirit_types)} 款烈酒，"
+            f"目前沒有找到可完全調製的雞尾酒。\n\n"
+            f"收藏的烈酒類型：{spirit_preview}"
+        )
+
+    lines: list[str] = [
+        f"🍸 您可以調製的雞尾酒 ({len(results)} 款)",
+        _SEP,
+        "",
+    ]
+    for i, r in enumerate(results, 1):
+        lines.append(f"{i}. {r['name']}")
+        if r.get("rating_value"):
+            lines.append(f"   ⭐ {r['rating_value']:.1f}/5")
+        lines.append("")
+    lines.append("💡 傳送『調酒詳情 <名稱>』查看完整酒譜")
     return "\n".join(lines)
 
 
@@ -806,6 +1012,14 @@ def fmt_help() -> str:
             "📖 酒譜查詢 (Difford's)",
             "• 酒譜 <酒名>    食材、作法、歷史",
             "  例：酒譜 Margarita",
+            "",
+            "🍸 調酒查詢 (Difford's)",
+            "• 調酒排行 [N]         評分最高的雞尾酒",
+            "• 調酒搜尋 <關鍵字>    搜尋雞尾酒名稱",
+            "• 調酒詳情 <名稱>      完整酒譜與評分",
+            "• 調酒統計             Difford's 資料庫摘要",
+            "• 調酒列表 [--ingredient/--tag/--rating]  篩選調酒",
+            "• 我能做什麼           根據收藏推薦可調製的雞尾酒",
             "",
             "🤖 系統指令",
             "• 執行 <模式>    啟動爬蟲 (test/full)",
@@ -864,6 +1078,39 @@ def parse_command(text: str) -> tuple[str, list[str | int | None]]:
             country = None
         return "list", [country, score]
 
+    # 調酒統計
+    if lower in ("調酒統計", "cocktail stats"):
+        return "cocktail_stats", []
+
+    # 調酒排行 [N] / cocktail top [N]
+    m = re.match(r"^(調酒排行|cocktail\s+top)\s*(\d+)?$", text, re.IGNORECASE)
+    if m:
+        n = int(m.group(2)) if m.group(2) else 10
+        return "cocktail_top", [min(n, 20)]
+
+    # 調酒搜尋 <kw> / cocktail search <kw>
+    m = re.match(r"^(調酒搜尋|cocktail\s+search)\s+(.+)$", text, re.IGNORECASE)
+    if m:
+        return "cocktail_search", [m.group(2).strip()]
+
+    # 調酒詳情 <name> / cocktail info <name>
+    m = re.match(r"^(調酒詳情|cocktail\s+info)\s+(.+)$", text, re.IGNORECASE)
+    if m:
+        return "cocktail_info", [m.group(2).strip()]
+
+    # 我能做什麼 / cocktail makeable / 調酒推薦
+    if lower in ("我能做什麼", "cocktail makeable", "調酒推薦"):
+        return "cocktail_makeable", []
+
+    # 調酒列表 [--ingredient X | --tag Y | --rating N] / cocktail list [...]
+    m = re.match(
+        r"^(調酒列表|cocktail\s+list)(\s+--(\w+)\s+(.+))?$", text, re.IGNORECASE
+    )
+    if m:
+        filter_type = m.group(3) if m.group(3) else None
+        filter_value = m.group(4).strip() if m.group(4) else None
+        return "cocktail_list_filter", [filter_type, filter_value]
+
     # 雞尾酒推薦（支援：雞尾酒 <酒名>、雞尾酒 <酒名> <偏好>、調酒 <酒名>）
     m = re.match(r"^(雞尾酒|調酒|cocktail)\s+(清單|list)$", text, re.IGNORECASE)
     if m:
@@ -911,10 +1158,29 @@ def create_app(
 
     @app.route("/health", methods=["GET"])
     def health():
+        diffords_exists = Path(diffords_db_path).exists()
+        diffords_count = None
+        diffords_last_scrape = None
+        diffords_avg_rating = None
+        if diffords_exists:
+            try:
+                from distiller_scraper.diffords_storage import DiffordsStorage
+
+                with DiffordsStorage(diffords_db_path) as ds:
+                    stats = ds.get_stats()
+                diffords_count = stats.get("總雞尾酒數")
+                diffords_last_scrape = stats.get("最後爬取")
+                diffords_avg_rating = stats.get("平均評分")
+            except Exception:
+                pass
         return {
             "status": "ok",
             "db_exists": Path(db_path).exists(),
             "token_cached": _token_cache.get("token") is not None,
+            "diffords_db_exists": diffords_exists,
+            "diffords_cocktail_count": diffords_count,
+            "diffords_last_scrape": diffords_last_scrape,
+            "diffords_avg_rating": diffords_avg_rating,
         }, 200
 
     @app.route("/webhook", methods=["POST"])
@@ -1016,7 +1282,7 @@ def _handle(
                 db_path, cocktail_name, pref_text, diffords_db_path=diffords_db_path
             )
         elif command == "cocktail_list":
-            return fmt_cocktail_list()
+            return _fmt_cocktail_recommend_list()
         elif command == "recipe":
             query = str(args[0]) if args else ""
             if not query:
@@ -1040,6 +1306,29 @@ def _handle(
                 logger.error("啟動爬蟲失敗：%s", exc)
                 return f"⚠️ 爬蟲啟動失敗：{exc}"
             return f"🚀 爬蟲已啟動（{mode} 模式），完成後將推播通知您。"
+        elif command == "cocktail_top":
+            n = int(args[0]) if args and args[0] is not None else 10
+            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
+            return fmt_cocktail_top(diffords_db_path, n)
+        elif command == "cocktail_search":
+            keyword = str(args[0]) if args else ""
+            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
+            return fmt_cocktail_search(diffords_db_path, keyword)
+        elif command == "cocktail_info":
+            name = str(args[0]) if args else ""
+            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
+            return fmt_cocktail_info(diffords_db_path, name)
+        elif command == "cocktail_stats":
+            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
+            return fmt_cocktail_stats(diffords_db_path)
+        elif command == "cocktail_list_filter":
+            filter_type = args[0] if args else None
+            filter_value = args[1] if len(args) > 1 else None
+            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
+            return fmt_cocktail_list(diffords_db_path, filter_type, filter_value)
+        elif command == "cocktail_makeable":
+            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
+            return fmt_cocktail_makeable(diffords_db_path, db_path)
         else:
             return f"不認識指令「{text}」。\n傳送「說明」查看所有指令。"
     except Exception as exc:

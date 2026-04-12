@@ -9,10 +9,22 @@ Difford's Guide 爬蟲模組單元測試
 
 import json
 import sqlite3
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from distiller_scraper.diffords_config import (
+    DEFAULT_DELAY_MAX,
+    DEFAULT_DELAY_MIN,
+    DIFFORDS_DB_DEFAULT,
+    DIFFORDS_DB_PATH,
+    DIFFORDS_NOTIFY_SOURCE,
+    DUPLICATE_RUN_WINDOW_HOURS,
+    GCS_DIFFORDS_DB_BLOB,
+    SITEMAP_URL,
+    _HEADERS,
+)
 from distiller_scraper.diffords_selectors import DiffordsExtractor
 from distiller_scraper.diffords_storage import DiffordsStorage
 from distiller_scraper.diffords_scraper import (
@@ -33,7 +45,11 @@ SAMPLE_JSON_LD = {
         "30 ml Rosso/sweet vermouth",
     ],
     "recipeInstructions": [
-        {"@type": "HowToStep", "name": "STIR", "text": "STIR all ingredients with ice."},
+        {
+            "@type": "HowToStep",
+            "name": "STIR",
+            "text": "STIR all ingredients with ice.",
+        },
         {"@type": "HowToStep", "name": "STRAIN", "text": "STRAIN into glass."},
     ],
     "keywords": ["Classic/vintage", "Bittersweet (e.g. Negroni)"],
@@ -94,8 +110,8 @@ SAMPLE_SITEMAP_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 
 # ── DiffordsExtractor 測試 ────────────────────────────────────────────
 
-class TestDiffordsExtractor:
 
+class TestDiffordsExtractor:
     def test_extract_json_ld(self):
         ld = DiffordsExtractor.extract_json_ld(SAMPLE_HTML)
         assert ld is not None
@@ -120,7 +136,9 @@ class TestDiffordsExtractor:
 
     def test_extract_all_html_fields(self):
         data = DiffordsExtractor.extract_all(SAMPLE_HTML)
-        assert data["glassware"] == "Old Fashioned Glass"  # 移除 "Photographed in a " 前綴
+        assert (
+            data["glassware"] == "Old Fashioned Glass"
+        )  # 移除 "Photographed in a " 前綴
         assert data["garnish"] == "Orange peel twist"
         assert data["review"] == "The iconic Italian aperitivo."
         assert data["history"] == "Created by Count Negroni in Florence, 1919."
@@ -131,11 +149,13 @@ class TestDiffordsExtractor:
         assert "Bittersweet (e.g. Negroni)" in data["tags"]
 
     def test_extract_ingredients_json_ld(self):
-        ings = DiffordsExtractor.parse_ingredients_json_ld([
-            "30 ml Gin",
-            "30 ml Red bitter liqueur",
-            "30 ml Rosso/sweet vermouth",
-        ])
+        ings = DiffordsExtractor.parse_ingredients_json_ld(
+            [
+                "30 ml Gin",
+                "30 ml Red bitter liqueur",
+                "30 ml Rosso/sweet vermouth",
+            ]
+        )
         assert len(ings) == 3
         assert ings[0]["amount"] == "30 ml"
         assert ings[0]["item"] == "Gin"
@@ -149,6 +169,7 @@ class TestDiffordsExtractor:
 
     def test_extract_ingredients_html(self):
         from bs4 import BeautifulSoup
+
         soup = BeautifulSoup(SAMPLE_HTML, "html.parser")
         ings = DiffordsExtractor.extract_ingredients_html(soup)
         assert len(ings) == 3
@@ -158,23 +179,32 @@ class TestDiffordsExtractor:
 
     def test_extract_abv(self):
         from bs4 import BeautifulSoup
+
         soup = BeautifulSoup(SAMPLE_HTML, "html.parser")
         abv = DiffordsExtractor.extract_abv(soup)
         assert abv == 16.14
 
     def test_extract_prep_time_minutes(self):
-        assert DiffordsExtractor.extract_prep_time_minutes({"totalTime": "PT03M0S"}) == 3
-        assert DiffordsExtractor.extract_prep_time_minutes({"totalTime": "PT1H30M"}) == 90
+        assert (
+            DiffordsExtractor.extract_prep_time_minutes({"totalTime": "PT03M0S"}) == 3
+        )
+        assert (
+            DiffordsExtractor.extract_prep_time_minutes({"totalTime": "PT1H30M"}) == 90
+        )
         assert DiffordsExtractor.extract_prep_time_minutes({}) is None
 
     def test_extract_calories(self):
-        assert DiffordsExtractor.extract_calories(
-            {"nutrition": {"calories": "200 calories"}}
-        ) == 200
+        assert (
+            DiffordsExtractor.extract_calories(
+                {"nutrition": {"calories": "200 calories"}}
+            )
+            == 200
+        )
         assert DiffordsExtractor.extract_calories({}) is None
 
 
 # ── DiffordsStorage 測試 ─────────────────────────────────────────────
+
 
 @pytest.fixture
 def storage(tmp_path):
@@ -215,7 +245,6 @@ SAMPLE_COCKTAIL = {
 
 
 class TestDiffordsStorage:
-
     def test_save_and_retrieve(self, storage):
         assert storage.save_cocktail(SAMPLE_COCKTAIL)
         result = storage.get_cocktail_by_name("Negroni")
@@ -274,6 +303,66 @@ class TestDiffordsStorage:
         results = storage.search_cocktails("XYZ_NOT_EXIST")
         assert results == []
 
+    def test_filter_by_ingredient_found(self, storage):
+        storage.save_cocktail(SAMPLE_COCKTAIL)
+        results = storage.filter_by_ingredient("bitter")
+        assert len(results) == 1
+        assert results[0]["name"] == "Negroni"
+        assert results[0]["ingredients"][0]["item"] == "Tanqueray Gin"
+
+    def test_filter_by_ingredient_empty(self, storage):
+        results = storage.filter_by_ingredient("Gin")
+        assert results == []
+
+    def test_filter_by_tag_found(self, storage):
+        storage.save_cocktail(SAMPLE_COCKTAIL)
+        results = storage.filter_by_tag("Classic/vintage")
+        assert len(results) == 1
+        assert results[0]["name"] == "Negroni"
+        assert "Classic/vintage" in results[0]["tags"]
+
+    def test_filter_by_tag_empty(self, storage):
+        storage.save_cocktail(SAMPLE_COCKTAIL)
+        results = storage.filter_by_tag("Smoky")
+        assert results == []
+
+    def test_filter_by_rating_range(self, storage):
+        storage.save_cocktail(SAMPLE_COCKTAIL)
+        higher = {
+            **SAMPLE_COCKTAIL,
+            "url": "https://www.diffordsguide.com/cocktails/recipe/2000/negroni-variant",
+            "name": "Negroni Variant",
+            "rating_value": 4.8,
+            "rating_count": 120,
+        }
+        low_count = {
+            **SAMPLE_COCKTAIL,
+            "url": "https://www.diffordsguide.com/cocktails/recipe/2001/negroni-lowcount",
+            "name": "Negroni Low Count",
+            "rating_value": 4.7,
+            "rating_count": 2,
+        }
+        storage.save_cocktail(higher)
+        storage.save_cocktail(low_count)
+
+        results = storage.filter_by_rating(min_rating=4.6, max_rating=5.0, min_count=5)
+        names = {item["name"] for item in results}
+        assert names == {"Negroni Variant"}
+
+    def test_filter_by_abv_range(self, storage):
+        storage.save_cocktail(SAMPLE_COCKTAIL)
+        strong = {
+            **SAMPLE_COCKTAIL,
+            "url": "https://www.diffordsguide.com/cocktails/recipe/2002/negroni-strong",
+            "name": "Negroni Strong",
+            "abv": 40.0,
+        }
+        storage.save_cocktail(strong)
+
+        results = storage.filter_by_abv(min_abv=10.0, max_abv=20.0)
+        names = {item["name"] for item in results}
+        assert names == {"Negroni"}
+
     def test_get_top_rated(self, storage):
         storage.save_cocktail(SAMPLE_COCKTAIL)
         results = storage.get_top_rated(limit=5)
@@ -321,11 +410,114 @@ class TestDiffordsStorage:
         assert result["ingredients"][0]["item"] == "Beefeater Gin"
         assert result["ingredients"][0]["amount"] == "45 ml"
 
+    def test_get_makeable_cocktails_full_match(self, storage):
+        cocktail = {
+            **SAMPLE_COCKTAIL,
+            "url": "https://www.diffordsguide.com/cocktails/recipe/2003/white-negroni",
+            "name": "White Negroni",
+            "rating_value": 4.7,
+            "rating_count": 80,
+            "ingredients_html": [
+                {"sort_order": 1, "amount": "30 ml", "item": "Gin"},
+                {"sort_order": 2, "amount": "30 ml", "item": "Sweet Vermouth"},
+                {"sort_order": 3, "amount": "30 ml", "item": "Lemon juice"},
+            ],
+            "ingredients_generic": [
+                {"sort_order": 1, "amount": "30 ml", "item": "Gin"},
+                {"sort_order": 2, "amount": "30 ml", "item": "Sweet Vermouth"},
+                {"sort_order": 3, "amount": "30 ml", "item": "Lemon juice"},
+            ],
+        }
+        storage.save_cocktail(cocktail)
+
+        mapping = {
+            "gin": ["London Dry Gin"],
+            "sweet vermouth": ["Vermouth"],
+            "lemon juice": "_non_spirit",
+        }
+        results = storage.get_makeable_cocktails(
+            ["London Dry Gin", "Vermouth"], mapping, limit=10
+        )
+        assert len(results) == 1
+        result = results[0]
+        assert result["name"] == "White Negroni"
+        assert result["match_score"] == 100
+        assert result["missing_ingredients"] == []
+        assert set(result["matched_ingredients"]) == {"gin", "sweet vermouth"}
+
+    def test_get_makeable_cocktails_missing_spirits(self, storage):
+        cocktail = {
+            **SAMPLE_COCKTAIL,
+            "url": "https://www.diffordsguide.com/cocktails/recipe/2004/dry-negroni",
+            "name": "Dry Negroni",
+            "rating_value": 4.6,
+            "rating_count": 60,
+            "ingredients_html": [
+                {"sort_order": 1, "amount": "30 ml", "item": "Gin"},
+                {"sort_order": 2, "amount": "30 ml", "item": "Sweet Vermouth"},
+            ],
+            "ingredients_generic": [
+                {"sort_order": 1, "amount": "30 ml", "item": "Gin"},
+                {"sort_order": 2, "amount": "30 ml", "item": "Sweet Vermouth"},
+            ],
+        }
+        storage.save_cocktail(cocktail)
+
+        mapping = {
+            "gin": ["London Dry Gin"],
+            "sweet vermouth": ["Vermouth"],
+        }
+        results = storage.get_makeable_cocktails(["Vermouth"], mapping, limit=10)
+        assert results == []
+
+    def test_get_makeable_cocktails_empty_spirit_types(self, storage):
+        cocktail = {
+            **SAMPLE_COCKTAIL,
+            "url": "https://www.diffordsguide.com/cocktails/recipe/2005/gin-only",
+            "name": "Gin Only",
+            "rating_value": 4.4,
+            "rating_count": 20,
+            "ingredients_html": [
+                {"sort_order": 1, "amount": "45 ml", "item": "Gin"},
+            ],
+            "ingredients_generic": [
+                {"sort_order": 1, "amount": "45 ml", "item": "Gin"},
+            ],
+        }
+        storage.save_cocktail(cocktail)
+
+        mapping = {"gin": ["London Dry Gin"]}
+        results = storage.get_makeable_cocktails([], mapping, limit=10)
+        assert results == []
+
+    def test_get_makeable_cocktails_non_spirit_auto_included(self, storage):
+        cocktail = {
+            **SAMPLE_COCKTAIL,
+            "url": "https://www.diffordsguide.com/cocktails/recipe/2006/limonada",
+            "name": "Limonada",
+            "rating_value": 4.2,
+            "rating_count": 10,
+            "ingredients_html": [
+                {"sort_order": 1, "amount": "90 ml", "item": "Lemon juice"},
+                {"sort_order": 2, "amount": "90 ml", "item": "Soda water"},
+            ],
+            "ingredients_generic": [
+                {"sort_order": 1, "amount": "90 ml", "item": "Lemon juice"},
+                {"sort_order": 2, "amount": "90 ml", "item": "Soda water"},
+            ],
+        }
+        storage.save_cocktail(cocktail)
+
+        mapping = {"lemon juice": "_non_spirit", "soda water": "_non_spirit"}
+        results = storage.get_makeable_cocktails([], mapping, limit=10)
+        assert len(results) == 1
+        assert results[0]["name"] == "Limonada"
+
 
 # ── DiffordsGuideScraper 測試 ─────────────────────────────────────────
 
-class TestDiffordsGuideScraper:
 
+class TestDiffordsGuideScraper:
     def test_parse_sitemap(self, tmp_path):
         with patch("distiller_scraper.diffords_scraper._build_session") as mock_sess_fn:
             mock_session = MagicMock()
@@ -341,7 +533,10 @@ class TestDiffordsGuideScraper:
         assert len(entries) == 3
         assert entries[0].cocktail_id == 1
         assert entries[0].slug == "abacaxi-ricaco"
-        assert entries[2].url == "https://www.diffordsguide.com/cocktails/recipe/1254/negroni"
+        assert (
+            entries[2].url
+            == "https://www.diffordsguide.com/cocktails/recipe/1254/negroni"
+        )
         assert entries[2].lastmod == "2026-04-01"
 
     def test_should_skip_new_url(self, tmp_path):
@@ -399,8 +594,11 @@ class TestDiffordsGuideScraper:
 
     def test_fetch_recipe_failure(self):
         import requests as req
+
         scraper = DiffordsGuideScraper()
-        with patch.object(scraper.session, "get", side_effect=req.RequestException("Network error")):
+        with patch.object(
+            scraper.session, "get", side_effect=req.RequestException("Network error")
+        ):
             result = scraper._fetch_recipe("https://example.com/fail")
         assert result is None
 
@@ -413,3 +611,170 @@ class TestDiffordsGuideScraper:
         assert stats["爬取新增"] == 10
         assert stats["跳過（已是最新）"] == 50
         assert stats["失敗"] == 2
+
+
+# ── DiffordsConfig 測試 ────────────────────────────────────────────
+
+
+class TestDiffordsConfig:
+    def test_all_constants_importable(self):
+        """驗證 diffords_config 中的所有常數都能正常導入。"""
+        assert DEFAULT_DELAY_MIN == 2.0
+        assert DEFAULT_DELAY_MAX == 4.0
+        assert SITEMAP_URL == "https://www.diffordsguide.com/sitemap/cocktail.xml"
+        assert DIFFORDS_DB_DEFAULT == "diffords.db"
+        assert DIFFORDS_DB_PATH == "diffords.db"
+        assert DUPLICATE_RUN_WINDOW_HOURS == 168
+        assert DIFFORDS_NOTIFY_SOURCE == "Difford's Guide"
+
+    def test_headers_structure(self):
+        """驗證 HTTP Header 的正確結構。"""
+        assert isinstance(_HEADERS, dict)
+        assert "User-Agent" in _HEADERS
+        assert "Accept-Language" in _HEADERS
+        assert "Accept" in _HEADERS
+        assert len(_HEADERS["User-Agent"]) > 0
+
+    def test_gcs_diffords_db_blob_default(self):
+        """驗證 GCS blob 名稱預設值。"""
+        assert GCS_DIFFORDS_DB_BLOB == "diffords.db"
+
+    def test_constants_types(self):
+        """驗證常數的型別。"""
+        assert isinstance(DEFAULT_DELAY_MIN, float)
+        assert isinstance(DEFAULT_DELAY_MAX, float)
+        assert isinstance(SITEMAP_URL, str)
+        assert isinstance(DIFFORDS_DB_DEFAULT, str)
+        assert isinstance(DUPLICATE_RUN_WINDOW_HOURS, int)
+        assert isinstance(DIFFORDS_NOTIFY_SOURCE, str)
+
+
+# ── IngredientMapping 測試 ─────────────────────────────────────────────
+
+_MAPPING_PATH = Path(__file__).parent.parent.parent / "ingredient_mapping.json"
+
+REQUIRED_SPIRIT_KEYS = [
+    "gin",
+    "bourbon",
+    "rye whiskey",
+    "scotch whisky",
+    "vodka",
+    "rum",
+    "dark rum",
+    "white rum",
+    "tequila",
+    "tequila blanco",
+    "cognac",
+    "sweet vermouth",
+    "dry vermouth",
+    "campari",
+    "triple sec",
+    "amaretto",
+    "maraschino liqueur",
+    "green chartreuse",
+    "crème de violette",
+    "absinthe",
+    "coffee liqueur",
+]
+
+NON_SPIRIT_KEYS = [
+    "lemon juice",
+    "lime juice",
+    "sugar syrup",
+    "simple syrup",
+    "egg white",
+    "bitters",
+    "angostura bitters",
+    "soda water",
+    "ginger beer",
+    "grenadine",
+]
+
+
+class TestIngredientMapping:
+    @pytest.fixture(scope="class")
+    def mapping(self):
+        with open(_MAPPING_PATH, encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_json_loads_successfully(self, mapping):
+        """JSON 能正常載入。"""
+        assert isinstance(mapping, dict)
+
+    def test_minimum_entry_count(self, mapping):
+        """≥30 個 entries（不計 _comment 等非成分 key）。"""
+        real_entries = {k: v for k, v in mapping.items() if not k.startswith("_")}
+        assert len(real_entries) >= 30, f"Only {len(real_entries)} entries found"
+
+    def test_not_exceed_300_entries(self, mapping):
+        """不超過 300 個 entries。"""
+        real_entries = {k: v for k, v in mapping.items() if not k.startswith("_")}
+        assert len(real_entries) <= 300
+
+    def test_required_spirit_keys_present(self, mapping):
+        """必要的烈酒 key 均存在。"""
+        missing = [k for k in REQUIRED_SPIRIT_KEYS if k not in mapping]
+        assert not missing, f"Missing keys: {missing}"
+
+    def test_spirit_values_are_lists(self, mapping):
+        """烈酒 key 的 value 應為 list（非 '_non_spirit'）。"""
+        for key in REQUIRED_SPIRIT_KEYS:
+            val = mapping[key]
+            assert isinstance(val, list), (
+                f"Key '{key}' should be a list, got {type(val)}"
+            )
+            assert len(val) > 0, f"Key '{key}' has empty list"
+
+    def test_non_spirit_keys_present(self, mapping):
+        """非烈酒 key 均存在。"""
+        missing = [k for k in NON_SPIRIT_KEYS if k not in mapping]
+        assert not missing, f"Missing non-spirit keys: {missing}"
+
+    def test_non_spirit_values_are_sentinel(self, mapping):
+        """非烈酒 key 的 value 應為 '_non_spirit'。"""
+        for key in NON_SPIRIT_KEYS:
+            assert mapping[key] == "_non_spirit", (
+                f"Key '{key}' should be '_non_spirit', got {mapping[key]!r}"
+            )
+
+    def test_gin_includes_london_dry(self, mapping):
+        """gin 映射包含 London Dry Gin。"""
+        assert "London Dry Gin" in mapping["gin"]
+
+    def test_bourbon_maps_to_bourbon(self, mapping):
+        """bourbon 映射包含 Bourbon。"""
+        assert "Bourbon" in mapping["bourbon"]
+
+    def test_rye_whiskey_maps_to_rye(self, mapping):
+        """rye whiskey 映射包含 Rye。"""
+        assert "Rye" in mapping["rye whiskey"]
+
+    def test_scotch_whisky_includes_single_malt(self, mapping):
+        """scotch whisky 映射包含 Single Malt。"""
+        assert "Single Malt" in mapping["scotch whisky"]
+
+    def test_vodka_maps_to_unflavored(self, mapping):
+        """vodka 映射包含 Unflavored Vodka。"""
+        assert "Unflavored Vodka" in mapping["vodka"]
+
+    def test_rum_includes_silver_and_dark(self, mapping):
+        """rum 映射包含 Silver Rum 與 Dark Rum。"""
+        assert "Silver Rum" in mapping["rum"]
+        assert "Dark Rum" in mapping["rum"]
+
+    def test_tequila_blanco_maps_correctly(self, mapping):
+        """tequila blanco 映射包含 Tequila Blanco。"""
+        assert "Tequila Blanco" in mapping["tequila blanco"]
+
+    def test_cognac_maps_to_cognac(self, mapping):
+        """cognac 映射包含 Cognac。"""
+        assert "Cognac" in mapping["cognac"]
+
+    def test_sweet_vermouth_maps_to_vermouth(self, mapping):
+        """sweet vermouth 映射包含 Vermouth。"""
+        assert "Vermouth" in mapping["sweet vermouth"]
+
+    def test_campari_maps_to_bitter_liqueur(self, mapping):
+        """campari 映射包含 Bitter Liqueurs 或 Amaro。"""
+        val = mapping["campari"]
+        assert "Bitter Liqueurs" in val or "Amaro" in val

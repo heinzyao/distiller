@@ -43,27 +43,13 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from .diffords_config import DEFAULT_DELAY_MAX, DEFAULT_DELAY_MIN, SITEMAP_URL, _HEADERS
 from .diffords_selectors import DiffordsExtractor
 from .diffords_storage import DiffordsStorage
 
 logger = logging.getLogger(__name__)
 
-SITEMAP_URL = "https://www.diffordsguide.com/sitemap/cocktail.xml"
 SITEMAP_NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9"
-
-# 尊重網站頻率限制
-DEFAULT_DELAY_MIN = 2.0
-DEFAULT_DELAY_MAX = 4.0
-
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
 
 
 @dataclass
@@ -137,7 +123,9 @@ class DiffordsGuideScraper:
 
         # 啟動時從 DB 預載，避免重複請求
         self.seen_urls: set[str] = storage.get_existing_urls() if storage else set()
-        self.lastmod_map: dict[str, str] = storage.get_url_lastmod_map() if storage else {}
+        self.lastmod_map: dict[str, str] = (
+            storage.get_url_lastmod_map() if storage else {}
+        )
 
         logger.info(
             "DiffordsGuideScraper 初始化完成：DB 已有 %d 筆雞尾酒",
@@ -170,11 +158,7 @@ class DiffordsGuideScraper:
 
             # 只取 /cocktails/recipe/{id}/{slug} 格式的 URL
             parts = loc.rstrip("/").split("/")
-            if (
-                len(parts) >= 2
-                and parts[-2].isdigit()
-                and "/cocktails/recipe/" in loc
-            ):
+            if len(parts) >= 2 and parts[-2].isdigit() and "/cocktails/recipe/" in loc:
                 try:
                     entries.append(
                         SitemapEntry(
@@ -199,7 +183,7 @@ class DiffordsGuideScraper:
         if entry.url not in self.seen_urls:
             return False  # 新 URL，必爬
         if not entry.lastmod:
-            return True   # 無 lastmod，保守跳過
+            return True  # 無 lastmod，保守跳過
         db_lastmod = self.lastmod_map.get(entry.url)
         if not db_lastmod:
             return False  # DB 無 lastmod，需重爬
@@ -258,7 +242,9 @@ class DiffordsGuideScraper:
 
             logger.info(
                 "[%d/%d] %s",
-                i, len(entries), entry.url,
+                i,
+                len(entries),
+                entry.url,
             )
             data = self._fetch_recipe(entry.url)
 
