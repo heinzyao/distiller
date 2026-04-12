@@ -19,6 +19,37 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-04-13 | OpenCode Atlas Orchestrator
+
+**工作內容**：
+1. **diffords-independence 計畫：Difford's Guide 爬蟲獨立排程 + 完整調酒查詢系統**
+   - **T1**: 建立 `distiller_scraper/diffords_config.py` 集中常數模組
+   - **T2**: 建立 `scripts/run_diffords.sh` 和 `com.distiller.diffords.plist` 獨立排程腳本
+   - **T3**: 建立 `ingredient_mapping.json`（117 筆材料對應，涵蓋所有烈酒類型）
+   - **T4**: 新增 4 個篩選方法至 `DiffordsStorage`（按材料、標籤、評分、ABV）
+   - **T5**: 實作 `get_makeable_cocktails()` 交叉查詢 + `load_ingredient_mapping()` + `get_user_spirit_types()`
+   - **T6**: `bot.py` 新增 `fmt_cocktail_top` + `fmt_cocktail_search`
+   - **T7**: `bot.py` 新增 `fmt_cocktail_info` + `fmt_cocktail_stats`
+   - **T8**: `bot.py` 新增 `fmt_cocktail_list`（篩選路由）+ `fmt_cocktail_makeable`
+   - **T9**: 擴展 `parse_command()` + `_handle()` 支援 6 個新調酒指令
+   - **T10**: `query.py` 新增 6 個 `cocktail-*` CLI 子指令
+   - **T11**: `fmt_help()` 新增 `🍸 調酒查詢` 段落 + 空資料庫測試
+   - **T12**: `/health` 端點新增 4 個 Difford's 欄位（`diffords_db_exists`、`diffords_cocktail_count`、`diffords_last_scrape`、`diffords_avg_rating`）
+   - **Fix**: 修復 lint 錯誤（F811 重複方法、F401 未用 import、F541 多餘 f-string）
+
+**主要變更**：
+- 新增 `distiller_scraper/diffords_config.py`（集中常數）
+- 新增 `ingredient_mapping.json`（117 筆材料對應）
+- 新增 `scripts/run_diffords.sh`（獨立排程腳本）
+- 新增 `com.distiller.diffords.plist`（launchd 每週排程）
+- 修改 `distiller_scraper/diffords_storage.py`（4 篩選方法 + 交叉查詢 + 輔助函式）
+- 修改 `bot.py`（6 個 `fmt_cocktail_*` 函式、`parse_command`、`_handle`、`fmt_help`、`/health`）
+- 修改 `query.py`（6 個 `cocktail-*` CLI 子指令）
+- 修改 `tests/unit/test_bot.py`、`tests/unit/test_diffords.py`、`tests/unit/test_query.py`
+- **總計：502 個測試全數通過**（基準 446，新增 56）
+
+**Commits**：`30ccce6`、`6808805`、`6b093d1`、`02249fa`、`413477a`、`7edf84a`、`87282f8`
+
 ### 2026-04-12 | OpenCode Sisyphus (Session 2)
 
 **工作內容**：
