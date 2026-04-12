@@ -337,14 +337,21 @@ class TestBotTwistDetection:
 # ─── avoid_flavors 懲罰測試 ───────────────────────────────────────
 
 
+import os
+
+_DB_PATH = "distiller.db"
+_HAS_DB = os.path.exists(_DB_PATH)
+
+
 @pytest.fixture
 def recommender():
     """使用真實資料庫的推薦引擎實例。"""
-    rec = CocktailRecommender("distiller.db")
+    rec = CocktailRecommender(_DB_PATH)
     yield rec
     rec.close()
 
 
+@pytest.mark.skipif(not _HAS_DB, reason="distiller.db not present (CI)")
 class TestAvoidFlavors:
     """avoid_flavors 懲罰測試。"""
 
