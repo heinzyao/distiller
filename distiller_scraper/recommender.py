@@ -452,51 +452,63 @@ COST_SYMBOLS = {1: "$", 2: "$$", 3: "$$$", 4: "$$$$", 5: "$$$$$"}
 
 def format_recommendation(result: CocktailRecommendation) -> str:
     """將推薦結果格式化為 LINE Bot 文字訊息。"""
+    _SEP_LINE = "──────────────────"
     lines: list[str] = []
 
-    twist_label = "（Twist 變化版）" if result.allow_twist else ""
-    lines.append(f"🍹 {result.cocktail_name}{twist_label} 用料推薦")
-    lines.append(f"風格：{result.flavor_style}")
-    lines.append(f"{result.cocktail_description}")
+    twist_label = " (Twist 變化版)" if result.allow_twist else ""
+    lines.append(f"🍹 {result.cocktail_name}{twist_label} 推薦")
+    lines.append(f"✨ 風格：{result.flavor_style}")
+    lines.append(f"📝 {result.cocktail_description}")
 
     # 顯示酒譜
     if result.recipe:
-        lines.append("─" * 30)
+        lines.append(_SEP_LINE)
         meta_parts = []
         if result.glassware:
-            meta_parts.append(f"杯型：{result.glassware}")
+            meta_parts.append(f"🥂 {result.glassware}")
         if result.method:
-            meta_parts.append(f"手法：{result.method}")
+            meta_parts.append(f"🥄 {result.method}")
         if meta_parts:
             lines.append("  ".join(meta_parts))
-        lines.append("📋 酒譜：")
+        lines.append("📋 經典酒譜：")
         for item in result.recipe:
-            note = f"（{item['note']}）" if item.get("note") else ""
-            lines.append(f"  • {item['item']}  {item['amount']}{note}")
+            note = f" ({item['note']})" if item.get("note") else ""
+            lines.append(f"  • {item['item']:<12} {item['amount']}{note}")
 
-    lines.append("─" * 30)
+    lines.append(_SEP_LINE)
 
     for ing in result.ingredients:
         lines.append(f"\n【{ing.label}】")
 
         if ing.recommend_mode == MODE_STATIC_ONLY:
             fb = ing.static_fallback or {}
-            usage = f"  用量：{fb['usage']}" if fb.get("usage") else ""
-            note = f"  說明：{fb['note']}" if fb.get("note") else ""
-            lines.append(f"  📌 {fb.get('name', '—')}{usage}{note}")
+            usage = f" (用量：{fb['usage']})" if fb.get("usage") else ""
+            lines.append(f"  📌 {fb.get('name', '—')}{usage}")
+            if fb.get("note"):
+                lines.append(f"     💡 {fb.get('note')}")
             continue
 
         if ing.candidates:
             for i, c in enumerate(ing.candidates, 1):
                 cost = COST_SYMBOLS.get(c.cost_level or 0, "?")
-                score_str = f"評分 {c.expert_score}" if c.expert_score else ""
+                score_str = f"⭐ {c.expert_score}" if c.expert_score else ""
                 abv_str = f"{c.abv}%" if c.abv else ""
                 meta = " | ".join(filter(None, [score_str, abv_str, cost, c.country]))
-                lines.append(f"  {'⭐' if i == 1 else f'{i}.'} {c.name}")
+                
+                # 依類型決定圖示 (簡化版)
+                s_type = c.spirit_type.lower()
+                icon = "🥃"
+                if "gin" in s_type: icon = "🧊"
+                elif "vodka" in s_type: icon = "❄️"
+                elif "rum" in s_type: icon = "🏴‍☠️"
+                elif "tequila" in s_type: icon = "🌵"
+
+                prefix = "🥇" if i == 1 else f"{i}."
+                lines.append(f"  {prefix} {icon} {c.name}")
                 if meta:
-                    lines.append(f"     {meta}")
+                    lines.append(f"     └ {meta}")
                 if c.flavor_summary:
-                    lines.append(f"     {c.flavor_summary}")
+                    lines.append(f"     └ 🎨 {c.flavor_summary}")
                 if i == 1 and c.explanation:
                     lines.append(f"\n     💬 {c.explanation}")
 
@@ -506,13 +518,13 @@ def format_recommendation(result: CocktailRecommendation) -> str:
                 fb = ing.static_fallback or {}
                 if fb.get("alternatives"):
                     alts = "、".join(fb["alternatives"])
-                    lines.append(f"  💡 其他選項：{alts}")
+                    lines.append(f"  💡 經典替代：{alts}")
 
         elif ing.used_fallback and ing.static_fallback:
             fb = ing.static_fallback
-            lines.append(f"  📌 {fb.get('name', '—')}（靜態推薦）")
+            lines.append(f"  📌 {fb.get('name', '—')} (經典推薦)")
             if fb.get("note"):
-                lines.append(f"     {fb['note']}")
+                lines.append(f"     💡 {fb['note']}")
             if fb.get("alternatives"):
                 alts = "、".join(fb["alternatives"])
                 lines.append(f"  💡 替代選項：{alts}")

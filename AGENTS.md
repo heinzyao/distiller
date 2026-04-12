@@ -570,6 +570,7 @@ python run.py --mode full
 - [x] 加入資料庫儲存支援 ✅ 2026-02-27
 - [x] LINE 通知與排程自動化 ✅ 2026-02-28
 - [x] LINE Bot（webhook 查詢）與 CLI 查詢工具 ✅ 2026-02-28
+- [x] LINE 訊息格式與文案全面美化 ✅ 2026-04-12
 - [x] 通知可靠性修復（重試、回傳值檢查）✅ 2026-03-01
 - [x] 爬蟲容錯修復（分頁 fallback 崩潰、per-category 錯誤隔離）✅ 2026-03-02
 - [x] 排程失敗根因修復（false failure + Chrome 版本不匹配 + page_errors 計數）✅ 2026-03-08

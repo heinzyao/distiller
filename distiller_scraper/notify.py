@@ -124,22 +124,23 @@ class LineNotifier:
         failed = stats.get("失敗 URL 數", stats.get("failed_urls", "?"))
         categories = stats.get("類別分布", stats.get("category_distribution", {}))
         lines = [
-            f"✅ {source} 爬蟲執行完成",
+            f"✅ {source} 數據更新報告",
             _SEP,
-            f"⏰ {self._timestamp()}",
+            f"📅 時間　{self._timestamp()}",
         ]
         if duration_secs > 0:
-            lines.append(f"⏱ 耗時 {_fmt_duration(duration_secs)}")
+            lines.append(f"⏱ 耗時　{_fmt_duration(duration_secs)}")
         lines.extend(
             [
+                f"⚙️ 模式　{mode.upper()}",
                 "",
-                f"  模式　　{mode}",
-                f"  總筆數　{total}",
-                f"  失敗數　{failed}",
+                "📈 執行數據",
+                f"  • 總記錄數　{total}",
+                f"  • 失敗連結　{failed}",
             ]
         )
         if page_errors > 0:
-            lines.append(f"  頁面錯誤　{page_errors}")
+            lines.append(f"  • 頁面錯誤　{page_errors}")
         if categories:
             cat_total = (
                 sum(categories.values())
@@ -147,17 +148,17 @@ class LineNotifier:
                 else 0
             )
             lines.append("")
-            lines.append("📋 類別分布")
+            lines.append("📊 類別分布")
             lines.append(_SEP_LIGHT)
             for k, v in categories.items():
                 if cat_total > 0 and isinstance(v, (int, float)):
                     bar_len = round(v / cat_total * 10)
                     bar = "█" * bar_len + "░" * (10 - bar_len)
-                    lines.append(f"  {k}　{bar} {v}")
+                    lines.append(f"  {k:<10} {bar} {v}")
                 else:
-                    lines.append(f"  {k}　{v}")
+                    lines.append(f"  {k:<10} {v}")
         else:
-            lines.append("  類別　　無")
+            lines.append("  • 類別分布　無數據")
 
         text = "\n".join(lines)
         return self.send(text)
@@ -172,41 +173,42 @@ class LineNotifier:
         source: str = "Distiller",
     ) -> bool:
         lines: list[str] = [
-            f"❌ {source} 爬蟲執行失敗",
+            f"❌ {source} 執行異常中斷",
             _SEP,
-            f"⏰ {self._timestamp()}",
+            f"📅 時間　{self._timestamp()}",
         ]
         if duration_secs > 0:
-            lines.append(f"⏱ 耗時 {_fmt_duration(duration_secs)}")
+            lines.append(f"⏱ 耗時　{_fmt_duration(duration_secs)}")
         lines.extend(
             [
-                "",
-                f"  模式　{mode}",
-                f"  錯誤　{error or '未知錯誤，請查看日誌。'}",
+                f"⚙️ 模式　{mode.upper()}",
+                f"⚠️ 錯誤原因",
+                f"  {error or '未知錯誤，請查看系統日誌。'}",
             ]
         )
         if page_errors > 0:
-            lines.append(f"  頁面錯誤數　{page_errors}")
+            lines.append(f"  頁面錯誤數：{page_errors}")
         if error_details:
             lines.append("")
-            lines.append("📋 錯誤詳情")
+            lines.append("📋 異常詳情")
             lines.append(_SEP_LIGHT)
             lines.append(error_details)
         return self.send("\n".join(lines))
 
     def notify_skipped(self, mode: str, last_run_at: str = "", source: str = "Distiller") -> bool:
         lines: list[str] = [
-            f"⏭️ {source} 爬蟲已跳過",
+            f"⏭️ {source} 更新任務跳過",
             _SEP,
-            f"⏰ {self._timestamp()}",
+            f"📅 時間　{self._timestamp()}",
             "",
-            f"  模式　　{mode}",
-            f"  原因　　{ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS} 小時內已有成功執行紀錄",
+            f"⚙️ 模式　{mode.upper()}",
+            "💡 原因",
+            f"  系統於 {ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS} 小時內已有成功紀錄",
         ]
         if last_run_at:
             try:
                 ts = datetime.fromisoformat(last_run_at).strftime("%Y-%m-%d %H:%M")
             except (ValueError, TypeError):
                 ts = last_run_at
-            lines.append(f"  上次執行　{ts}")
+            lines.append(f"  上次執行：{ts}")
         return self.send("\n".join(lines))
