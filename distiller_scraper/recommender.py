@@ -7,10 +7,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
+import os
 import sqlite3
 from dataclasses import dataclass, field
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from .cocktail_db import (
     MODE_DYNAMIC,
@@ -40,6 +44,7 @@ class SpiritCandidate:
     flavors: dict[str, float] = field(default_factory=dict)
     score: float = 0.0
     score_breakdown: dict[str, float] = field(default_factory=dict)
+    explanation: str = ""
 
 
 @dataclass
@@ -57,6 +62,10 @@ class CocktailRecommendation:
     cocktail_name: str
     cocktail_description: str
     flavor_style: str
+    recipe: list[dict] = field(default_factory=list)
+    glassware: str = ""
+    method: str = ""
+    allow_twist: bool = False
     ingredients: list[IngredientRecommendation] = field(default_factory=list)
 
 
@@ -99,11 +108,14 @@ class CocktailRecommender:
         result = recommender.recommend("negroni", user_flavor_prefs={"bitter": 80})
     """
 
-    # 評分權重
-    W_COCKTAIL_FLAVOR = 0.45   # 與雞尾酒理想風味的相似度
-    W_USER_FLAVOR = 0.30       # 與用戶個人偏好的相似度
-    W_EXPERT_SCORE = 0.15      # 專家評分
-    W_COMMUNITY_SCORE = 0.10   # 社群評分
+    # 評分權重（風味符合度優先）
+    W_COCKTAIL_FLAVOR = 0.60   # 與雞尾酒理想風味的相似度
+    W_USER_FLAVOR = 0.25       # 與用戶個人偏好的相似度
+    W_EXPERT_SCORE = 0.10      # 專家評分（輔助參考）
+    W_COMMUNITY_SCORE = 0.05   # 社群評分
+
+    # 符合酒譜經典款型的加分
+    CLASSIC_SUBTYPE_BONUS = 0.08
 
     def __init__(self, db_path: str = "distiller.db"):
         self.conn = sqlite3.connect(db_path)
@@ -115,6 +127,8 @@ class CocktailRecommender:
         user_flavor_prefs: Optional[dict[str, float]] = None,
         max_cost_level: Optional[int] = None,
         top_k: int = 3,
+        allow_twist: bool = False,
+        with_explanations: bool = False,
     ) -> Optional[CocktailRecommendation]:
         """
         為指定雞尾酒的每個成分推薦烈酒。
@@ -124,6 +138,7 @@ class CocktailRecommender:
             user_flavor_prefs: 用戶風味偏好，例如 {"smoky": 80, "sweet": 20}
             max_cost_level: 最高價格等級 (1–5)，None = 不限
             top_k: 每個成分最多推薦幾筆
+            allow_twist: True = 不套用經典款加分，適合 twist/variation 詢問
 
         Returns:
             CocktailRecommendation 或 None（找不到雞尾酒）
@@ -136,11 +151,18 @@ class CocktailRecommender:
             cocktail_name=cocktail["name"],
             cocktail_description=cocktail["description"],
             flavor_style=cocktail["flavor_style"],
+            recipe=cocktail.get("recipe", []),
+            glassware=cocktail.get("glassware", ""),
+            method=cocktail.get("method", ""),
+            allow_twist=allow_twist,
         )
 
         for ing in cocktail["ingredients"]:
-            rec = self._recommend_ingredient(ing, user_flavor_prefs, max_cost_level, top_k)
+            rec = self._recommend_ingredient(ing, user_flavor_prefs, max_cost_level, top_k, allow_twist)
             result.ingredients.append(rec)
+
+        if with_explanations:
+            self.generate_explanations(result, user_flavor_prefs)
 
         return result
 
@@ -150,6 +172,7 @@ class CocktailRecommender:
         user_flavor_prefs: Optional[dict[str, float]],
         max_cost_level: Optional[int],
         top_k: int,
+        allow_twist: bool = False,
     ) -> IngredientRecommendation:
         mode = ingredient["recommend_mode"]
         rec = IngredientRecommendation(
@@ -170,6 +193,8 @@ class CocktailRecommender:
             scored = self._score_candidates(
                 candidates, ingredient["ideal_flavors"], user_flavor_prefs,
                 ingredient.get("abv_range"),
+                classic_subtypes=ingredient.get("classic_subtypes", []),
+                allow_twist=allow_twist,
             )
             rec.candidates = scored[:top_k]
         elif mode == MODE_DYNAMIC_OR_STATIC and ingredient.get("static_fallback"):
@@ -270,6 +295,8 @@ class CocktailRecommender:
         ideal_flavors: dict[str, float],
         user_flavor_prefs: Optional[dict[str, float]],
         abv_range: Optional[tuple],
+        classic_subtypes: Optional[list[str]] = None,
+        allow_twist: bool = False,
     ) -> list[SpiritCandidate]:
         """對每位候選烈酒計算綜合評分並排序。"""
         max_expert = max((c.expert_score or 0) for c in candidates) or 100
@@ -303,18 +330,76 @@ class CocktailRecommender:
                     + self.W_COMMUNITY_SCORE * community_norm
                 )
 
-            c.score = raw * abv_pen
+            base_score = raw * abv_pen
+
+            # 經典款加分：非 twist 模式且符合 classic_subtypes 時加分
+            classic_bonus = 0.0
+            if not allow_twist and classic_subtypes and c.spirit_type in classic_subtypes:
+                classic_bonus = self.CLASSIC_SUBTYPE_BONUS
+
+            c.score = base_score + classic_bonus
             c.score_breakdown = {
                 "cocktail_flavor_sim": round(cocktail_sim, 3),
                 "user_flavor_sim": round(user_sim, 3),
                 "expert_norm": round(expert_norm, 3),
                 "community_norm": round(community_norm, 3),
                 "abv_penalty": round(abv_pen, 3),
+                "classic_bonus": round(classic_bonus, 3),
                 "final_score": round(c.score, 4),
             }
 
         candidates.sort(key=lambda c: c.score, reverse=True)
         return candidates
+
+    def generate_explanations(
+        self,
+        result: CocktailRecommendation,
+        user_flavor_prefs: Optional[dict[str, float]] = None,
+    ) -> None:
+        """為每個成分的首選烈酒，透過 Claude API 生成個人化說明（in-place 修改）。
+
+        若 ANTHROPIC_API_KEY 未設定或 API 呼叫失敗，靜默跳過。
+        """
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            return
+
+        try:
+            import anthropic
+        except ImportError:
+            logger.warning("anthropic 套件未安裝，跳過說明生成")
+            return
+
+        client = anthropic.Anthropic(api_key=api_key)
+        pref_text = (
+            f"用戶偏好風味：{json.dumps(user_flavor_prefs, ensure_ascii=False)}" if user_flavor_prefs else ""
+        )
+
+        for ing in result.ingredients:
+            if ing.recommend_mode == MODE_STATIC_ONLY or not ing.candidates:
+                continue
+            top = ing.candidates[0]
+            spirit_info = (
+                f"品名：{top.name}\n"
+                f"類型：{top.spirit_type}\n"
+                f"產地：{top.country}\n"
+                f"ABV：{top.abv}%\n"
+                f"風味摘要：{top.flavor_summary}\n"
+                f"品飲筆記：{top.tasting_notes or '（無）'}"
+            )
+            prompt = (
+                f"你是一位專業品酒師。請用繁體中文，以2-3句話說明下列烈酒為何特別適合作為「{result.cocktail_name}」的「{ing.label}」成分。"
+                f"著重在風味搭配邏輯，語氣自然，不要條列。{pref_text}\n\n{spirit_info}"
+            )
+            try:
+                msg = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=200,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                top.explanation = msg.content[0].text.strip()
+            except Exception as e:
+                logger.warning(f"generate_explanation 失敗（{top.name}）: {e}")
 
     def close(self):
         self.conn.close()
@@ -334,9 +419,27 @@ COST_SYMBOLS = {1: "$", 2: "$$", 3: "$$$", 4: "$$$$", 5: "$$$$$"}
 def format_recommendation(result: CocktailRecommendation) -> str:
     """將推薦結果格式化為 LINE Bot 文字訊息。"""
     lines: list[str] = []
-    lines.append(f"🍹 {result.cocktail_name} 用料推薦")
+
+    twist_label = "（Twist 變化版）" if result.allow_twist else ""
+    lines.append(f"🍹 {result.cocktail_name}{twist_label} 用料推薦")
     lines.append(f"風格：{result.flavor_style}")
     lines.append(f"{result.cocktail_description}")
+
+    # 顯示酒譜
+    if result.recipe:
+        lines.append("─" * 30)
+        meta_parts = []
+        if result.glassware:
+            meta_parts.append(f"杯型：{result.glassware}")
+        if result.method:
+            meta_parts.append(f"手法：{result.method}")
+        if meta_parts:
+            lines.append("  ".join(meta_parts))
+        lines.append("📋 酒譜：")
+        for item in result.recipe:
+            note = f"（{item['note']}）" if item.get("note") else ""
+            lines.append(f"  • {item['item']}  {item['amount']}{note}")
+
     lines.append("─" * 30)
 
     for ing in result.ingredients:
@@ -360,6 +463,8 @@ def format_recommendation(result: CocktailRecommendation) -> str:
                     lines.append(f"     {meta}")
                 if c.flavor_summary:
                     lines.append(f"     {c.flavor_summary}")
+                if i == 1 and c.explanation:
+                    lines.append(f"\n     💬 {c.explanation}")
 
             if ing.used_fallback or (ing.recommend_mode == MODE_DYNAMIC_OR_STATIC and ing.static_fallback):
                 fb = ing.static_fallback or {}

@@ -528,6 +528,9 @@ def fmt_run_status() -> str:
     return "💤 目前無爬蟲執行中"
 
 
+_TWIST_KEYWORDS = {"twist", "variation", "變化", "創意", "非傳統", "特色"}
+
+
 def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None) -> str:
     """雞尾酒多成分推薦，整合 CocktailRecommender。"""
     from distiller_scraper.cocktail_db import get_cocktail, list_cocktails
@@ -551,6 +554,11 @@ def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None) -> st
             "傳送「雞尾酒 清單」查看完整列表。"
         )
 
+    # 偵測 twist/variation 模式
+    allow_twist = bool(
+        pref_text and any(k in pref_text.lower() for k in _TWIST_KEYWORDS)
+    )
+
     # 解析偏好文字為風味向量（簡單關鍵字對應）
     user_flavor_prefs = _parse_flavor_prefs(pref_text) if pref_text else None
 
@@ -559,6 +567,8 @@ def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None) -> st
             cocktail_query,
             user_flavor_prefs=user_flavor_prefs,
             top_k=3,
+            allow_twist=allow_twist,
+            with_explanations=bool(os.environ.get("ANTHROPIC_API_KEY")),
         )
 
     if result is None:
@@ -566,7 +576,7 @@ def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None) -> st
 
     text = format_recommendation(result)
 
-    if pref_text:
+    if pref_text and not allow_twist:
         text += f"\n\n💬 根據您的偏好「{pref_text}」調整排序"
 
     return text
