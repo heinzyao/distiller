@@ -359,13 +359,14 @@ class DistillerScraperV2:
             "gin": ScraperConfig.GIN_STYLES,
             "rum": ScraperConfig.RUM_STYLES,
             "vodka": ScraperConfig.VODKA_STYLES,
+            "liqueurs-bitters": ScraperConfig.LIQUEURS_STYLES,
         }
         queries = []
         if use_styles and category in style_map:
             for style_id, style_name in style_map[category]:
                 url = (
                     f"https://distiller.com/search"
-                    f"?category={category}&spirit_style_id={style_id}&sort=distiller_score"
+                    f"?spirit_style_id={style_id}&sort=distiller_score"
                 )
                 queries.append((url, style_name))
         else:

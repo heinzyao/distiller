@@ -110,6 +110,18 @@ class ScraperConfig:
         ("124", "Barrel-Aged Vodka"),
     ]
 
+    LIQUEURS_STYLES = [
+        ("140", "Bitter Liqueurs"),       # Campari, Aperol
+        ("139", "Amaro"),                  # Amaro Montenegro, Fernet-Branca, Amaro Nonino
+        ("132", "Anise Liqueurs"),         # Sambuca, Absinthe
+        ("137", "Coffee Liqueurs"),        # Mr. Black, Kahlúa
+        ("135", "Floral Liqueurs"),        # St-Germain Elderflower
+        ("129", "Fruit Liqueurs"),         # Maraschino, Cointreau, Triple Sec
+        ("134", "Herbal/Spice Liqueurs"),  # Drambuie, Green Chartreuse, Bénédictine
+        ("150", "Chocolate Liqueurs"),     # Crème de Cacao
+        ("136", "Dairy/Egg Liqueurs"),     # Baileys, Advocaat
+    ]
+
     # 主要國家 ID
     TOP_COUNTRIES = [
         ("1", "Scotland"),

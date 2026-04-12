@@ -45,7 +45,7 @@ def main():
         scraper.scrape(
             categories=["liqueurs-bitters"],
             max_per_category=args.max,
-            use_styles=False,
+            use_styles=True,
             use_pagination=not args.no_pagination,
         )
         if scraper.failed_urls or scraper.page_errors:
