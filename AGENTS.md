@@ -521,9 +521,11 @@ python run.py --mode full
 | `distiller_scraper/notify.py` | LINE 通知模組（LineNotifier） |
 | `run.py` | 執行入口（支援 --output, --db-path, --no-pagination, --use-api, --notify-line） |
 | `bot.py` | LINE Bot（Flask webhook，port 8000，簽名驗證 + 查詢回覆） |
-| `query.py` | CLI 查詢工具（list / search / top / info / stats / flavors / export） |
+| `query.py` | CLI 查詢工具（list / search / top / info / stats / flavors / export / cocktail-*） |
 | `scripts/run_scraper.sh` | 排程執行腳本（每日凌晨 3:00） |
+| `scripts/run_diffords.sh` | Difford's 排程執行腳本（每週日 04:00） |
 | `scripts/run_bot.sh` | Bot 啟動腳本（供 launchd 使用） |
+| `ingredient_mapping.json` | 材料-烈酒類型對應表（117 筆，供交叉查詢用） |
 
 ---
 
@@ -545,9 +547,14 @@ python run.py --mode full
    │   ├── config.py          # 爬蟲配置（含分頁常數）
    │   ├── storage.py         # 儲存後端 (SQLiteStorage, CSVStorage)
    │   ├── api_client.py      # API 端點探索客戶端
+   │   ├── diffords_scraper.py   # Difford's Guide 爬蟲
+   │   ├── diffords_selectors.py # Difford's HTML / JSON-LD 擷取器
+   │   ├── diffords_storage.py   # Difford's 酒譜 SQLite 儲存層
+   │   ├── diffords_config.py    # Difford's Guide 設定常數
    │   └── notify.py          # LINE 通知模組 (LineNotifier)
    ├── scripts/
    │   ├── run_scraper.sh     # 排程執行腳本（爬蟲，每日凌晨 3:00）
+   │   ├── run_diffords.sh    # Difford's 排程腳本（每週日 04:00）
    │   └── run_bot.sh         # Bot 啟動腳本（載入 .env 後執行 bot.py）
    ├── tests/
    │   ├── unit/              # 單元測試（無網路/瀏覽器）
@@ -555,8 +562,10 @@ python run.py --mode full
    ├── run.py                 # 執行入口
    ├── bot.py                 # LINE Bot（Flask webhook，port 8000）
    ├── query.py               # CLI 查詢工具（sqlite3 直查）
+   ├── ingredient_mapping.json  # 材料-烈酒類型對應表（117 筆）
    ├── .env                   # 環境變數（LINE 憑證，不進版控）
    ├── com.distiller.scraper.plist  # launchd 排程設定（爬蟲）
+   ├── com.distiller.diffords.plist # launchd 排程設定（Difford's）
    └── com.distiller.bot.plist      # launchd 服務設定（Bot，需手動安裝）
    ```
 
@@ -628,7 +637,10 @@ python run.py --mode full
 - [x] Chrome 145 renderer timeout 修復（page_load_strategy='none' + 反偵測 + User-Agent）✅ 2026-03-10
 - [x] 詳情頁渲染等待不足修復（2s → INITIAL_PAGE_DELAY）✅ 2026-03-10
 - [x] API 誤識別第三方 URL 修復（netloc 網域篩選）✅ 2026-03-10
+- [x] Difford's Guide 獨立排程（diffords_config.py + run_diffords.sh + launchd plist）✅ 2026-04-13
+- [x] 調酒篩選查詢（按材料/標籤/評分/ABV + 交叉查詢可調酒推薦）✅ 2026-04-13
+- [x] LINE Bot 調酒指令（6 個 `調酒` 子指令 + CLI `cocktail-*` 子指令）✅ 2026-04-13
 
 ---
 
-*最後更新：2026-04-12 by OpenCode Sisyphus*
+*最後更新：2026-04-13 by OpenCode Atlas Orchestrator*

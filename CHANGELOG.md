@@ -2,6 +2,54 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.11.0] - 2026-04-13
+
+### 新增
+- **Difford's Guide 獨立排程**
+  - 新增 `distiller_scraper/diffords_config.py`：集中管理 Difford's 常數（DB 路徑、爬蟲參數）
+  - 新增 `scripts/run_diffords.sh`：獨立排程執行腳本（與 Distiller 爬蟲完全分離）
+  - 新增 `com.distiller.diffords.plist`：macOS launchd 每週排程（週日 04:00）
+
+- **材料對應資料**
+  - 新增 `ingredient_mapping.json`：117 筆材料名稱 → 烈酒類型對應（涵蓋 Gin、Rum、Vodka、Whiskey、Tequila、Brandy/Cognac、Liqueur、Wine/Vermouth、Bitters、Beer）
+
+- **調酒篩選查詢**（`distiller_scraper/diffords_storage.py`）
+  - `filter_by_ingredient(ingredient, limit)`：按材料名稱篩選
+  - `filter_by_tag(tag, limit)`：按標籤篩選
+  - `filter_by_rating(min_rating, max_rating, min_count, limit)`：按評分範圍篩選
+  - `filter_by_abv(min_abv, max_abv, limit)`：按酒精濃度篩選
+
+- **交叉查詢：可調酒推薦**（`distiller_scraper/diffords_storage.py`）
+  - `get_makeable_cocktails(user_spirits, mapping_path, match_ratio)`：根據用戶擁有的烈酒，推薦可調製的雞尾酒
+  - `load_ingredient_mapping(path)`：載入材料對應表
+  - `get_user_spirit_types(db_path)`：從 Distiller DB 取得用戶烈酒類型清單
+
+- **LINE Bot 調酒指令**（`bot.py`）
+  - `調酒 排行` / `cocktail top`：Difford's 評分排行榜
+  - `調酒 搜尋 <關鍵字>` / `cocktail search`：名稱模糊搜尋
+  - `調酒 詳情 <名稱>` / `cocktail info`：完整酒譜（食材 + 作法 + 歷史）
+  - `調酒 統計` / `cocktail stats`：資料庫統計概覽
+  - `調酒 清單 材料|標籤|評分|ABV <值>`：篩選查詢
+  - `調酒 推薦` / `cocktail makeable`：根據已有烈酒推薦可調酒
+
+- **CLI 調酒查詢子指令**（`query.py`）
+  - `cocktail-top`、`cocktail-search`、`cocktail-info`、`cocktail-stats`、`cocktail-list`、`cocktail-makeable`
+
+- **`/health` 端點擴充**（`bot.py`）
+  - 新增 `diffords_db_exists`、`diffords_cocktail_count`、`diffords_last_scrape`、`diffords_avg_rating` 欄位
+
+- **`fmt_help()` 擴充**（`bot.py`）
+  - 新增「🍸 調酒查詢」指令群組段落
+
+### 修復
+- 移除 `diffords_storage.py` 中重複的 `get_makeable_cocktails` 方法（F811）
+- 移除未使用的 `import json`（F401）
+- 修正無佔位符的 f-string（F541）
+
+### 測試
+- 新增 56 個測試（篩選方法、交叉查詢、Bot 格式化、CLI 子指令、help 文字、空 DB 處理）
+- 總測試數：502 passed（基準 446）
+
 ## [2.10.0] - 2026-04-12
 
 ### 改善

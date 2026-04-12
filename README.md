@@ -18,9 +18,10 @@ A Python web scraper project designed to extract liquor reviews and spirit profi
 - Multiple storage backends: CSV / SQLite / Both combined.
 - **Cocktail Recommender**: multi-ingredient spirit recommendations for 29 classic cocktails with flavor-vector scoring and natural language preference parsing.
 - **Difford's Guide Scraper**: lightweight scraper (requests + BeautifulSoup, no Chrome) for cocktail recipes from diffordsguide.com — sitemap-driven incremental updates.
+- **Cocktail Query System**: Search, filter, and cross-query 6000+ cocktail recipes from Difford's Guide database — by ingredient, tag, rating, ABV, or spirit availability.
 - **`recipe` Bot Command**: query full cocktail recipes (ingredients, instructions, history, review) from the Difford's Guide database.
 - **Claude API Integration**: optional AI-generated sommelier-style explanations for top recommendations.
-- 446 automated tests with GitHub Actions CI/CD pipelines.
+- 502 automated tests with GitHub Actions CI/CD pipelines.
 
 ### Project Structure
 
@@ -35,6 +36,7 @@ distiller/
 │   ├── diffords_scraper.py    # Difford's Guide Scraper (requests + BeautifulSoup)
 │   ├── diffords_selectors.py  # HTML / JSON-LD Extractor for Difford's Guide
 │   ├── diffords_storage.py    # SQLite Storage for Difford's cocktail recipes
+│   ├── diffords_config.py      # Difford's Guide Configuration Constants
 │   ├── cocktail_db.py         # 29 Classic Cocktails Knowledge Base
 │   ├── flavor_parser.py       # Natural Language Flavor Preference Parser
 │   └── recommender.py         # CocktailRecommender (flavor-vector scoring)
@@ -46,10 +48,14 @@ distiller/
 ├── Dockerfile.scraper         # Scraper container (Chrome + Selenium)
 ├── Dockerfile.diffords        # Difford's scraper container (lightweight, ~200 MB)
 ├── Dockerfile.bot             # LINE Bot container
+├── ingredient_mapping.json     # Ingredient-to-Spirit-Type Mapping (117 entries)
 ├── scripts/
 │   ├── run_scraper.sh         # Scheduled Scraping Script
+│   ├── run_diffords.sh         # Difford's Scheduled Scraping Script
 │   └── run_bot.sh             # LINE Bot Launch Script (used for launchd)
 ├── AGENTS.md                  # Multi-agent Collaboration Logs
+├── com.distiller.scraper.plist # Distiller Scheduled Scraping (Daily 3 AM)
+├── com.distiller.diffords.plist  # Difford's launchd Schedule (Weekly)
 └── CHANGELOG.md               # Changelog
 ```
 
@@ -120,7 +126,7 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `cocktail`, `recipe` / `酒譜`, `help`
+Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `cocktail`, `recipe` / `酒譜`, `調酒`, `help`
 
 #### Difford's Guide Scraper
 
@@ -136,6 +142,17 @@ python run_diffords.py --mode full
 # Test run (10 recipes)
 python run_diffords.py --mode test
 ```
+
+#### Cocktail Query Commands (LINE Bot)
+
+| Command | Description |
+|---------|-------------|
+| `調酒 排行` | Top-rated cocktails |
+| `調酒 搜尋 <keyword>` | Search by name |
+| `調酒 詳情 <name>` | Full recipe details |
+| `調酒 統計` | Database statistics |
+| `調酒 清單 材料\|標籤\|評分\|ABV <value>` | Filter query |
+| `調酒 推薦` | Recommend based on your spirits |
 
 ### Testing
 
@@ -259,9 +276,10 @@ MIT
 - 多儲存後端：CSV / SQLite / 雙輸出
 - **雞尾酒推薦引擎**：29 款經典雞尾酒多成分推薦，風味向量評分，自然語言偏好解析
 - **Difford's Guide 爬蟲**：輕量爬蟲（requests + BeautifulSoup，無需 Chrome），從 diffordsguide.com 爬取雞尾酒酒譜，Sitemap 驅動增量更新
+- **調酒查詢系統**：搜尋、篩選、交叉查詢 Difford's Guide 資料庫 6000+ 雞尾酒酒譜 — 依材料、標籤、評分、ABV 或可用烈酒
 - **`酒譜` Bot 指令**：查詢 Difford's Guide 資料庫的完整酒譜（食材、作法、歷史、評語）
 - **Claude API 整合**：可選的 AI 品酒師口吻個人化說明
-- 446 個自動化測試，GitHub Actions CI/CD
+- 502 個自動化測試，GitHub Actions CI/CD
 
 ### 專案結構
 
@@ -276,6 +294,7 @@ distiller/
 │   ├── diffords_scraper.py    # Difford's Guide 爬蟲（requests + BeautifulSoup）
 │   ├── diffords_selectors.py  # Difford's HTML / JSON-LD 資料擷取器
 │   ├── diffords_storage.py    # Difford's 雞尾酒酒譜 SQLite 儲存層
+│   ├── diffords_config.py      # Difford's Guide 設定常數
 │   ├── cocktail_db.py         # 29 款經典雞尾酒知識庫
 │   ├── flavor_parser.py       # 自然語言風味偏好解析器
 │   └── recommender.py         # 雞尾酒推薦引擎（風味向量評分）
@@ -287,10 +306,14 @@ distiller/
 ├── Dockerfile.scraper         # 爬蟲容器（Chrome + Selenium，~800 MB）
 ├── Dockerfile.diffords        # Difford's 爬蟲容器（輕量，~200 MB）
 ├── Dockerfile.bot             # LINE Bot 容器
+├── ingredient_mapping.json     # 材料-烈酒類型對應表（117 筆）
 ├── scripts/
 │   ├── run_scraper.sh         # 排程爬取腳本
+│   ├── run_diffords.sh         # Difford's 排程爬取腳本
 │   └── run_bot.sh             # Bot 啟動腳本（launchd 用）
 ├── AGENTS.md                  # 多代理協作紀錄
+├── com.distiller.scraper.plist # Distiller 排程爬取（每日凌晨 3 點）
+├── com.distiller.diffords.plist  # Difford's launchd 排程（每週）
 └── CHANGELOG.md               # 變更紀錄
 ```
 
@@ -361,7 +384,7 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`雞尾酒`、`酒譜`、`說明`
+支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`雞尾酒`、`酒譜`、`調酒`、`說明`
 
 #### Difford's Guide 爬蟲
 
@@ -377,6 +400,17 @@ python run_diffords.py --mode full
 # 測試模式（僅爬 10 筆）
 python run_diffords.py --mode test
 ```
+
+#### 調酒查詢指令（LINE Bot）
+
+| 指令 | 說明 |
+|------|------|
+| `調酒 排行` | 評分排行榜 |
+| `調酒 搜尋 <關鍵字>` | 名稱模糊搜尋 |
+| `調酒 詳情 <名稱>` | 完整酒譜詳情 |
+| `調酒 統計` | 資料庫統計概覽 |
+| `調酒 清單 材料\|標籤\|評分\|ABV <值>` | 篩選查詢 |
+| `調酒 推薦` | 根據已有烈酒推薦可調酒 |
 
 ### 測試
 
