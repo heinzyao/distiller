@@ -117,13 +117,14 @@ class LineNotifier:
             return False
 
     def notify_success(
-        self, mode: str, stats: dict, duration_secs: int = 0, page_errors: int = 0
+        self, mode: str, stats: dict, duration_secs: int = 0, page_errors: int = 0,
+        source: str = "Distiller",
     ) -> bool:
         total = stats.get("總記錄數", stats.get("total_records", "?"))
         failed = stats.get("失敗 URL 數", stats.get("failed_urls", "?"))
         categories = stats.get("類別分布", stats.get("category_distribution", {}))
         lines = [
-            "✅ Distiller 爬蟲執行完成",
+            f"✅ {source} 爬蟲執行完成",
             _SEP,
             f"⏰ {self._timestamp()}",
         ]
@@ -168,9 +169,10 @@ class LineNotifier:
         page_errors: int = 0,
         error_details: str = "",
         duration_secs: int = 0,
+        source: str = "Distiller",
     ) -> bool:
         lines: list[str] = [
-            "❌ Distiller 爬蟲執行失敗",
+            f"❌ {source} 爬蟲執行失敗",
             _SEP,
             f"⏰ {self._timestamp()}",
         ]
@@ -192,9 +194,9 @@ class LineNotifier:
             lines.append(error_details)
         return self.send("\n".join(lines))
 
-    def notify_skipped(self, mode: str, last_run_at: str = "") -> bool:
+    def notify_skipped(self, mode: str, last_run_at: str = "", source: str = "Distiller") -> bool:
         lines: list[str] = [
-            "⏭️ Distiller 爬蟲已跳過",
+            f"⏭️ {source} 爬蟲已跳過",
             _SEP,
             f"⏰ {self._timestamp()}",
             "",

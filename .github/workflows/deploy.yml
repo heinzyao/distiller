@@ -60,6 +60,32 @@ jobs:
             --set-env-vars GCS_BUCKET=distiller-data \
             --set-secrets LINE_CHANNEL_ID=DISTILLER_LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=DISTILLER_LINE_CHANNEL_SECRET:latest,LINE_USER_ID=DISTILLER_LINE_USER_ID:latest
 
+      # ── Diffords 爬蟲容器（輕量，無 Chrome）─────────────────────
+      - name: Build diffords image
+        run: |
+          docker build \
+            -f Dockerfile.diffords \
+            -t gcr.io/$PROJECT_ID/distiller-diffords:$GITHUB_SHA \
+            -t gcr.io/$PROJECT_ID/distiller-diffords:latest \
+            .
+
+      - name: Push diffords image
+        run: docker push --all-tags gcr.io/$PROJECT_ID/distiller-diffords
+
+      - name: Deploy Cloud Run Job (diffords)
+        run: |
+          gcloud run jobs update distiller-diffords \
+            --image gcr.io/$PROJECT_ID/distiller-diffords:$GITHUB_SHA \
+            --region $REGION \
+          || gcloud run jobs create distiller-diffords \
+            --image gcr.io/$PROJECT_ID/distiller-diffords:$GITHUB_SHA \
+            --region $REGION \
+            --memory 512Mi \
+            --cpu 1 \
+            --task-timeout 7200 \
+            --set-env-vars GCS_BUCKET=distiller-data,GCS_DB_BLOB=diffords.db \
+            --set-secrets LINE_CHANNEL_ID=DISTILLER_LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=DISTILLER_LINE_CHANNEL_SECRET:latest,LINE_USER_ID=DISTILLER_LINE_USER_ID:latest
+
       # ── Bot 容器 ───────────────────────────────────────────────
       - name: Build bot image
         run: |

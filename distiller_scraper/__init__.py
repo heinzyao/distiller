@@ -21,11 +21,12 @@ Distiller.com 爬蟲模組（V2.3.0）：烈酒評分資料擷取與查詢工具
     from distiller_scraper import DistillerScraperV2
 """
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 __all__ = [
     "DistillerScraperV2", "ScraperConfig", "Selectors",
     "SQLiteStorage", "CSVStorage", "DistillerAPIClient",
     "LineNotifier",
+    "DiffordsGuideScraper", "DiffordsStorage", "DiffordsExtractor",
 ]
 
 
@@ -56,4 +57,13 @@ def __getattr__(name):
     elif name == "LineNotifier":
         from .notify import LineNotifier
         return LineNotifier
+    elif name == "DiffordsGuideScraper":
+        from .diffords_scraper import DiffordsGuideScraper
+        return DiffordsGuideScraper
+    elif name == "DiffordsStorage":
+        from .diffords_storage import DiffordsStorage
+        return DiffordsStorage
+    elif name == "DiffordsExtractor":
+        from .diffords_selectors import DiffordsExtractor
+        return DiffordsExtractor
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
