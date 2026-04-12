@@ -86,17 +86,17 @@ Distiller 專案每日從 distiller.com 爬取烈酒評測資料（目前 2,840 
 
 **測試狀態**：373 passed，0 failures（2026-03-31）
 
-### 3.3 支援的雞尾酒清單（23 款）
+### 3.3 支援的雞尾酒清單（29 款）
 
 | 類型 | 酒款 |
 |------|------|
-| 琴酒基底 | Negroni、Martini、Gimlet、Last Word、French 75、Singapore Sling |
-| 威士忌基底 | Old Fashioned、Manhattan、Whiskey Sour、Sazerac、Penicillin、Paper Plane |
-| 蘭姆基底 | Daiquiri、Mojito、Dark & Stormy |
+| 琴酒基底 | Negroni、Martini、Gimlet、Last Word、French 75、Singapore Sling、Aviation |
+| 威士忌基底 | Old Fashioned、Manhattan、Whiskey Sour、Sazerac、Penicillin、Paper Plane、Vieux Carré |
+| 蘭姆基底 | Daiquiri、Mojito、Dark & Stormy、Jungle Bird |
 | 伏特加基底 | Cosmopolitan、Moscow Mule、Espresso Martini |
-| 龍舌蘭基底 | Margarita、Paloma |
-| 白蘭地基底 | Sidecar、Pisco Sour |
-| 利口酒主角 | Aperol Spritz |
+| 龍舌蘭基底 | Margarita、Paloma、Tommy's Margarita |
+| 白蘭地基底 | Sidecar、Pisco Sour、B&B |
+| 利口酒主角 | Aperol Spritz、Amaretto Sour |
 
 ---
 
@@ -123,22 +123,20 @@ Distiller 專案每日從 distiller.com 爬取烈酒評測資料（目前 2,840 
 
 ### 🟠 中優先 — 功能增強
 
-#### TODO-3：自然語言偏好解析強化
+#### TODO-3：自然語言偏好解析強化 ✅
 
-**現況**：`_parse_flavor_prefs()` 使用關鍵字比對，中文偏好有效，但英文偏好覆蓋有限。
+**完成**：已重構為獨立模組 `distiller_scraper/flavor_parser.py`。
 
-**改善方向**：
-```python
-# 目前：僅關鍵字比對
-"我喜歡煙燻泥煤風格" → {"smoky": 80, "peaty": 85}
-
-# 未來：加入更多語意對應
-"像 Islay 風格"      → {"smoky": 80, "peaty": 85, "salty": 50, "earthy": 40}
-"類似 Highland Park" → 查詢 DB 中 Highland Park 的風味向量作為參考
-"不要太甜"           → {"sweet": 10}  # 反向偏好
-```
-
-**或**：接入 Claude API，讓 LLM 直接將偏好文字轉換為風味向量（成本：~0.001 USD / 次）。
+**實作內容**：
+- 擴充關鍵字從 26 個至 ~50 個（含中英文風味詞）
+- 否定偏好偵測（「不甜」「不要太煙燻」）→ `avoid_flavors` set
+- 修復「不甜」vs「甜」子字串碰撞 bug（consumed span tracking）
+- 地區/風格參照（「像 Islay 風格」→ 靜態風味向量）
+- 酒款參照提取（「類似 Highland Park」→ DB 查詢平均風味向量）
+- 強度修飾詞（「很煙燻」1.15x、「微甜」0.6x）
+- `recommender.py` 新增 `avoid_flavors` 懲罰（維度值 > 50 時 score *= 0.7）
+- 36 個新測試（test_flavor_parser.py）+ 3 個 avoid_flavors 測試（test_recommender.py）
+- 446 個單元測試全數通過
 
 ---
 
@@ -165,18 +163,20 @@ Distiller 專案每日從 distiller.com 爬取烈酒評測資料（目前 2,840 
 
 ---
 
-#### TODO-5：新增雞尾酒（擴充知識庫）
+#### TODO-5：新增雞尾酒（擴充知識庫）✅
 
-目前支援 23 款，建議補充：
+已完成：知識庫從 23 款擴充至 29 款。
 
-| 酒款 | 基底 | 原因 |
-|------|------|------|
-| Aviation | 琴酒 | 含 Crème de Violette，特殊利口酒推薦機會 |
-| Vieux Carré | 裸麥 + 干邑 | 多基酒混合，測試複雜成分推薦 |
-| Jungle Bird | 蘭姆 | 含 Campari，與 Negroni 互補 |
-| Amaretto Sour | Amaretto | 利口酒為主角的案例 |
-| B&B | 干邑 + Bénédictine | 測試草本利口酒推薦 |
-| Tommy's Margarita | 龍舌蘭 | 無橙味利口酒的 Margarita 變體 |
+| 酒款 | 基底 | 成分數 | 說明 |
+|------|------|--------|------|
+| Aviation | 琴酒 | 3 | Gin + Maraschino (Fruit Liqueurs) + Crème de Violette (Floral Liqueurs) |
+| Vieux Carré | 裸麥 + 干邑 | 5 | Rye + Cognac + Sweet Vermouth + Bénédictine + 雙苦精 |
+| Jungle Bird | 蘭姆 | 2 | Dark Rum + Campari (Bitter Liqueurs) |
+| Amaretto Sour | Amaretto + 波本 | 2 | Amaretto (Amaro/Fruit Liqueurs) + Bourbon |
+| B&B | 干邑 | 2 | Cognac + Bénédictine (static_only) |
+| Tommy's Margarita | 龍舌蘭 | 1 | Tequila Blanco（無橙味利口酒） |
+
+446 個單元測試全數通過（含 COCKTAIL_DB 完整性驗證）。
 
 ---
 
@@ -271,9 +271,9 @@ gcloud run jobs execute distiller-scraper --region=asia-east1 --project=amateur-
        TODO-2  ✅ 驗證關鍵利口酒品牌覆蓋率（Campari/Aperol/Nonino/Luxardo 全數收錄）
        TODO-8  ✅ deploy.yml 記憶體 2Gi → 4Gi（commit c75a30d）
 
-短期   TODO-3  自然語言偏好解析強化
-       TODO-4  Claude API 個人化推薦說明
-       TODO-5  新增 6 款雞尾酒
+短期   TODO-3  ✅ 自然語言偏好解析強化（flavor_parser.py 模組、否定偏好、地區風格、酒款參照、強度修飾、avoid_flavors 懲罰）
+       TODO-4  ✅ Claude API 個人化推薦說明（v2.7.0）
+       TODO-5  ✅ 新增 6 款雞尾酒（Aviation, Vieux Carré, Jungle Bird, Amaretto Sour, B&B, Tommy's Margarita）
 
 長期   TODO-6  RAG 語意搜尋層
        TODO-7  推薦品質評估機制

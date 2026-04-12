@@ -2,6 +2,35 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.9.0] - 2026-04-12
+
+### 新增
+- **自然語言偏好解析模組**（`distiller_scraper/flavor_parser.py`）
+  - 獨立模組，取代 `bot.py` 中的 `_parse_flavor_prefs()` 內聯函式
+  - 擴充關鍵字從 26 個至 ~50 個（含中英文風味詞）
+  - 否定偏好偵測（「不甜」「不要太煙燻」）→ `avoid_flavors` set
+  - 修復「不甜」vs「甜」子字串碰撞 bug（consumed span tracking）
+  - 地區/風格參照（「像 Islay 風格」→ 靜態風味向量）
+  - 酒款參照提取（「類似 Highland Park」→ DB 查詢平均風味向量）
+  - 強度修飾詞（「很煙燻」1.15x、「微甜」0.6x）
+
+- **新增 6 款雞尾酒**（`distiller_scraper/cocktail_db.py`，23 → 29 款）
+  - Aviation（Gin + Maraschino + Crème de Violette）
+  - Vieux Carré（Rye + Cognac + Sweet Vermouth + Bénédictine + 雙苦精，5 成分）
+  - Jungle Bird（Dark Rum + Campari）
+  - Amaretto Sour（Amaretto + Bourbon，利口酒主角案例）
+  - B&B（Cognac + Bénédictine）
+  - Tommy's Margarita（Tequila Blanco，無橙味利口酒）
+
+### 變更
+- `bot.py`：刪除 `_parse_flavor_prefs()` 內聯函式，改用 `flavor_parser.parse_flavor_prefs()`；新增酒款參照 DB 查詢與 `avoid_flavors` 傳遞
+- `distiller_scraper/recommender.py`：`recommend()` / `_score_candidates()` 新增 `avoid_flavors` 參數，維度值 >50 時 score *= 0.7
+
+### 測試
+- 新增 36 個 flavor_parser 單元測試（`tests/unit/test_flavor_parser.py`）
+- 新增 3 個 avoid_flavors 推薦引擎測試（`tests/unit/test_recommender.py`）
+- 總測試數：446 passed
+
 ## [2.8.0] - 2026-04-12
 
 ### 新增

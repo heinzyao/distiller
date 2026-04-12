@@ -72,6 +72,7 @@ _MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}  # Top 3 排行獎牌
 def _truncate(text: str, max_len: int) -> str:
     return text[:max_len] + "…" if len(text) > max_len else text
 
+
 # Access Token 快取：避免每次 Webhook 請求都重新取得 Token
 # 結構：{"token": str, "expires_at": float（UNIX timestamp）}
 # 設計理由：LINE Channel Access Token 有效期 30 天，但短期 token 有效期約 30 天
@@ -206,7 +207,14 @@ def _start_scraper_cloud_run(mode: str) -> None:
     overrides = run_v2.RunJobRequest.Overrides(
         container_overrides=[
             run_v2.RunJobRequest.Overrides.ContainerOverride(
-                args=["--mode", mode, "--output", "sqlite", "--use-api", "--notify-line"]
+                args=[
+                    "--mode",
+                    mode,
+                    "--output",
+                    "sqlite",
+                    "--use-api",
+                    "--notify-line",
+                ]
             )
         ]
     )
@@ -553,7 +561,9 @@ def fmt_recipe(diffords_db_path: str, query: str) -> str:
             else:
                 lines = [f"🔎 找到 {len(results)} 筆相關酒譜：", _SEP_LIGHT]
                 for r in results:
-                    rating = f" ⭐{r['rating_value']:.1f}" if r.get("rating_value") else ""
+                    rating = (
+                        f" ⭐{r['rating_value']:.1f}" if r.get("rating_value") else ""
+                    )
                     lines.append(f"• {r['name']}{rating}")
                 lines.append("")
                 lines.append("傳送「酒譜 <確切名稱>」查看詳情。")
@@ -649,11 +659,16 @@ def _get_diffords_reference(diffords_db_path: str | None, cocktail_name: str) ->
         return ""
 
 
-def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None,
-                 diffords_db_path: str | None = None) -> str:
+def fmt_cocktail(
+    db_path: str,
+    cocktail_query: str,
+    pref_text: str | None,
+    diffords_db_path: str | None = None,
+) -> str:
     """雞尾酒多成分推薦，整合 CocktailRecommender。"""
     from distiller_scraper.cocktail_db import get_cocktail, list_cocktails
     from distiller_scraper.recommender import CocktailRecommender, format_recommendation
+    from distiller_scraper.flavor_parser import parse_flavor_prefs
 
     cocktail = get_cocktail(cocktail_query)
     # 若查無結果且有偏好文字，嘗試將「酒名 + 偏好文字」合起來當酒名
@@ -678,8 +693,40 @@ def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None,
         pref_text and any(k in pref_text.lower() for k in _TWIST_KEYWORDS)
     )
 
-    # 解析偏好文字為風味向量（簡單關鍵字對應）
-    user_flavor_prefs = _parse_flavor_prefs(pref_text) if pref_text else None
+    # 解析偏好文字為風味向量、避免風味、酒款參照
+    user_flavor_prefs = None
+    avoid_flavors = None
+    if pref_text:
+        parsed = parse_flavor_prefs(pref_text)
+        user_flavor_prefs = parsed.flavor_vector
+        avoid_flavors = parsed.avoid_flavors or None
+
+        # 酒款參照解析：查 DB 取平均風味向量，合併至 user_flavor_prefs
+        if parsed.spirit_refs:
+            with _connect(db_path) as conn:
+                for ref_name in parsed.spirit_refs:
+                    rows = conn.execute(
+                        "SELECT id FROM spirits WHERE name LIKE ?",
+                        (f"%{ref_name}%",),
+                    ).fetchall()
+                    if rows:
+                        spirit_ids = [r["id"] for r in rows]
+                        placeholders = ",".join("?" * len(spirit_ids))
+                        flavor_rows = conn.execute(
+                            f"SELECT flavor_name, AVG(flavor_value) AS avg_val "
+                            f"FROM flavor_profiles WHERE spirit_id IN ({placeholders}) "
+                            f"GROUP BY flavor_name",
+                            spirit_ids,
+                        ).fetchall()
+                        if flavor_rows:
+                            if user_flavor_prefs is None:
+                                user_flavor_prefs = {}
+                            for fr in flavor_rows:
+                                dim = fr["flavor_name"]
+                                val = float(fr["avg_val"])
+                                user_flavor_prefs[dim] = max(
+                                    user_flavor_prefs.get(dim, 0.0), val
+                                )
 
     with CocktailRecommender(db_path) as rec:
         result = rec.recommend(
@@ -688,6 +735,7 @@ def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None,
             top_k=3,
             allow_twist=allow_twist,
             with_explanations=bool(os.environ.get("ANTHROPIC_API_KEY")),
+            avoid_flavors=avoid_flavors,
         )
 
     if result is None:
@@ -704,47 +752,6 @@ def fmt_cocktail(db_path: str, cocktail_query: str, pref_text: str | None,
         text += ref
 
     return text
-
-
-def _parse_flavor_prefs(pref_text: str) -> dict[str, float] | None:
-    """將自然語言偏好文字轉換為風味向量（關鍵字比對）。"""
-    _KEYWORD_MAP: dict[str, dict[str, float]] = {
-        "煙燻": {"smoky": 80, "peaty": 60},
-        "泥煤": {"peaty": 85, "smoky": 70, "earthy": 50},
-        "花香": {"floral": 80, "fruity": 50},
-        "果香": {"fruity": 80, "floral": 40, "sweet": 50},
-        "草本": {"herbal": 80, "juniper": 60},
-        "辛香": {"spicy": 80, "herbal": 50},
-        "甜": {"sweet": 75, "vanilla": 55},
-        "不甜": {"sweet": 10, "tart": 40},
-        "苦": {"bitter": 75, "herbal": 50},
-        "濃郁": {"rich": 80, "full_bodied": 70, "sweet": 50},
-        "清爽": {"tart": 50, "floral": 55, "sweet": 25, "rich": 20},
-        "柑橘": {"fruity": 70, "tart": 60, "floral": 40},
-        "香草": {"vanilla": 80, "sweet": 60, "rich": 50},
-        "木質": {"woody": 75, "earthy": 50, "rich": 55},
-        "咖啡": {"rich": 70, "bitter": 60, "roast": 65},
-        "海鹽": {"salty": 70, "briny": 60},
-        "輕盈": {"floral": 60, "fruity": 50, "rich": 20, "full_bodied": 25},
-        "重口": {"rich": 80, "full_bodied": 80, "spicy": 60},
-        "juniper": {"juniper": 85},
-        "smoky": {"smoky": 80},
-        "peaty": {"peaty": 85},
-        "floral": {"floral": 80},
-        "herbal": {"herbal": 80},
-        "fruity": {"fruity": 80},
-        "sweet": {"sweet": 75},
-        "spicy": {"spicy": 80},
-    }
-
-    merged: dict[str, float] = {}
-    pref_lower = pref_text.lower()
-    for keyword, flavors in _KEYWORD_MAP.items():
-        if keyword in pref_lower:
-            for k, v in flavors.items():
-                merged[k] = max(merged.get(k, 0.0), v)
-
-    return merged if merged else None
 
 
 def fmt_cocktail_list() -> str:
@@ -935,9 +942,9 @@ def create_app(
 
             user_id = event.get("source", {}).get("userId", "")
 
-            response = _handle(user_text, db_path,
-                               diffords_db_path=diffords_db_path,
-                               user_id=user_id)
+            response = _handle(
+                user_text, db_path, diffords_db_path=diffords_db_path, user_id=user_id
+            )
 
             token = _get_cached_token(_channel_id, _channel_secret)
             if token:
@@ -951,9 +958,12 @@ def create_app(
     return app
 
 
-def _handle(text: str, db_path: str,
-            diffords_db_path: str = DIFFORDS_DB_DEFAULT,
-            user_id: str | None = None) -> str:
+def _handle(
+    text: str,
+    db_path: str,
+    diffords_db_path: str = DIFFORDS_DB_DEFAULT,
+    user_id: str | None = None,
+) -> str:
     """解析指令並回傳回覆文字。"""
     if not Path(db_path).exists():
         if not _ensure_db_from_gcs(db_path):
@@ -1000,8 +1010,9 @@ def _handle(text: str, db_path: str,
             cocktail_name = str(args[0]) if args[0] else ""
             pref_text = str(args[1]) if len(args) > 1 and args[1] else None
             _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
-            return fmt_cocktail(db_path, cocktail_name, pref_text,
-                                diffords_db_path=diffords_db_path)
+            return fmt_cocktail(
+                db_path, cocktail_name, pref_text, diffords_db_path=diffords_db_path
+            )
         elif command == "cocktail_list":
             return fmt_cocktail_list()
         elif command == "recipe":

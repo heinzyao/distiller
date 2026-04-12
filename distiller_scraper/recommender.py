@@ -27,6 +27,7 @@ from .cocktail_db import (
 
 # ─── 資料類別 ──────────────────────────────────────────────────
 
+
 @dataclass
 class SpiritCandidate:
     spirit_id: int
@@ -71,6 +72,7 @@ class CocktailRecommendation:
 
 # ─── 相似度計算 ────────────────────────────────────────────────
 
+
 def _cosine_similarity(a: dict[str, float], b: dict[str, float]) -> float:
     """計算兩個稀疏向量的餘弦相似度（鍵為維度名稱）。"""
     if not a or not b:
@@ -99,6 +101,7 @@ def _abv_penalty(abv: Optional[float], abv_range: Optional[tuple]) -> float:
 
 # ─── 主要推薦類別 ──────────────────────────────────────────────
 
+
 class CocktailRecommender:
     """
     根據雞尾酒知識庫與 Distiller DB，為每個成分推薦最適合的烈酒。
@@ -109,10 +112,10 @@ class CocktailRecommender:
     """
 
     # 評分權重（風味符合度優先）
-    W_COCKTAIL_FLAVOR = 0.60   # 與雞尾酒理想風味的相似度
-    W_USER_FLAVOR = 0.25       # 與用戶個人偏好的相似度
-    W_EXPERT_SCORE = 0.10      # 專家評分（輔助參考）
-    W_COMMUNITY_SCORE = 0.05   # 社群評分
+    W_COCKTAIL_FLAVOR = 0.60  # 與雞尾酒理想風味的相似度
+    W_USER_FLAVOR = 0.25  # 與用戶個人偏好的相似度
+    W_EXPERT_SCORE = 0.10  # 專家評分（輔助參考）
+    W_COMMUNITY_SCORE = 0.05  # 社群評分
 
     # 符合酒譜經典款型的加分
     CLASSIC_SUBTYPE_BONUS = 0.08
@@ -129,6 +132,7 @@ class CocktailRecommender:
         top_k: int = 3,
         allow_twist: bool = False,
         with_explanations: bool = False,
+        avoid_flavors: set[str] | None = None,
     ) -> Optional[CocktailRecommendation]:
         """
         為指定雞尾酒的每個成分推薦烈酒。
@@ -158,7 +162,14 @@ class CocktailRecommender:
         )
 
         for ing in cocktail["ingredients"]:
-            rec = self._recommend_ingredient(ing, user_flavor_prefs, max_cost_level, top_k, allow_twist)
+            rec = self._recommend_ingredient(
+                ing,
+                user_flavor_prefs,
+                max_cost_level,
+                top_k,
+                allow_twist,
+                avoid_flavors=avoid_flavors,
+            )
             result.ingredients.append(rec)
 
         if with_explanations:
@@ -173,6 +184,7 @@ class CocktailRecommender:
         max_cost_level: Optional[int],
         top_k: int,
         allow_twist: bool = False,
+        avoid_flavors: set[str] | None = None,
     ) -> IngredientRecommendation:
         mode = ingredient["recommend_mode"]
         rec = IngredientRecommendation(
@@ -191,10 +203,13 @@ class CocktailRecommender:
 
         if candidates:
             scored = self._score_candidates(
-                candidates, ingredient["ideal_flavors"], user_flavor_prefs,
+                candidates,
+                ingredient["ideal_flavors"],
+                user_flavor_prefs,
                 ingredient.get("abv_range"),
                 classic_subtypes=ingredient.get("classic_subtypes", []),
                 allow_twist=allow_twist,
+                avoid_flavors=avoid_flavors,
             )
             rec.candidates = scored[:top_k]
         elif mode == MODE_DYNAMIC_OR_STATIC and ingredient.get("static_fallback"):
@@ -286,7 +301,9 @@ class CocktailRecommender:
         ).fetchall()
         result: dict[int, dict[str, float]] = {}
         for row in rows:
-            result.setdefault(row["spirit_id"], {})[row["flavor_name"]] = float(row["flavor_value"])
+            result.setdefault(row["spirit_id"], {})[row["flavor_name"]] = float(
+                row["flavor_value"]
+            )
         return result
 
     def _score_candidates(
@@ -297,6 +314,7 @@ class CocktailRecommender:
         abv_range: Optional[tuple],
         classic_subtypes: Optional[list[str]] = None,
         allow_twist: bool = False,
+        avoid_flavors: set[str] | None = None,
     ) -> list[SpiritCandidate]:
         """對每位候選烈酒計算綜合評分並排序。"""
         max_expert = max((c.expert_score or 0) for c in candidates) or 100
@@ -332,9 +350,22 @@ class CocktailRecommender:
 
             base_score = raw * abv_pen
 
+            # avoid_flavors 懲罰：若烈酒在被避免的風味維度上值 > 50，乘以 0.7
+            avoid_penalty = 1.0
+            if avoid_flavors:
+                for dim in avoid_flavors:
+                    if c.flavors.get(dim, 0) > 50:
+                        avoid_penalty *= 0.7
+
+            base_score = base_score * avoid_penalty
+
             # 經典款加分：非 twist 模式且符合 classic_subtypes 時加分
             classic_bonus = 0.0
-            if not allow_twist and classic_subtypes and c.spirit_type in classic_subtypes:
+            if (
+                not allow_twist
+                and classic_subtypes
+                and c.spirit_type in classic_subtypes
+            ):
                 classic_bonus = self.CLASSIC_SUBTYPE_BONUS
 
             c.score = base_score + classic_bonus
@@ -344,6 +375,7 @@ class CocktailRecommender:
                 "expert_norm": round(expert_norm, 3),
                 "community_norm": round(community_norm, 3),
                 "abv_penalty": round(abv_pen, 3),
+                "avoid_penalty": round(avoid_penalty, 3),
                 "classic_bonus": round(classic_bonus, 3),
                 "final_score": round(c.score, 4),
             }
@@ -372,7 +404,9 @@ class CocktailRecommender:
 
         client = anthropic.Anthropic(api_key=api_key)
         pref_text = (
-            f"用戶偏好風味：{json.dumps(user_flavor_prefs, ensure_ascii=False)}" if user_flavor_prefs else ""
+            f"用戶偏好風味：{json.dumps(user_flavor_prefs, ensure_ascii=False)}"
+            if user_flavor_prefs
+            else ""
         )
 
         for ing in result.ingredients:
@@ -466,7 +500,9 @@ def format_recommendation(result: CocktailRecommendation) -> str:
                 if i == 1 and c.explanation:
                     lines.append(f"\n     💬 {c.explanation}")
 
-            if ing.used_fallback or (ing.recommend_mode == MODE_DYNAMIC_OR_STATIC and ing.static_fallback):
+            if ing.used_fallback or (
+                ing.recommend_mode == MODE_DYNAMIC_OR_STATIC and ing.static_fallback
+            ):
                 fb = ing.static_fallback or {}
                 if fb.get("alternatives"):
                     alts = "、".join(fb["alternatives"])

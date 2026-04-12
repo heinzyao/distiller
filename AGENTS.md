@@ -19,6 +19,34 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-04-12 | OpenCode Sisyphus
+
+**工作內容**：
+1. **TODO-3：自然語言偏好解析強化**
+   - 新增 `distiller_scraper/flavor_parser.py`（246 行）：`ParseResult` dataclass + `parse_flavor_prefs()` 純函式
+   - 擴充關鍵字（26 → ~50 個）、否定偏好（`avoid_flavors` set）、地區/風格參照、酒款參照提取、強度修飾詞
+   - 修復「不甜」vs「甜」子字串碰撞 bug（consumed span tracking）
+   - 更新 `bot.py`：刪除舊 `_parse_flavor_prefs()`，改用新模組 + spirit-ref DB 查詢 + `avoid_flavors` 傳遞
+   - 更新 `recommender.py`：`recommend()` / `_score_candidates()` 新增 `avoid_flavors` 懲罰（維度值 >50 時 score *= 0.7）
+   - 新增 36 個測試（`test_flavor_parser.py`）+ 3 個 avoid_flavors 測試（`test_recommender.py`）
+
+2. **TODO-5：新增 6 款雞尾酒**（23 → 29 款）
+   - Aviation（Gin + Maraschino + Crème de Violette，3 成分動態推薦）
+   - Vieux Carré（Rye + Cognac + Vermouth + Bénédictine + 雙苦精，5 成分最複雜）
+   - Jungle Bird（Dark Rum + Campari）
+   - Amaretto Sour（Amaretto + Bourbon，利口酒主角案例）
+   - B&B（Cognac + Bénédictine）
+   - Tommy's Margarita（Tequila Blanco，無橙味利口酒）
+
+**主要變更**：
+- 新增 `distiller_scraper/flavor_parser.py`（自然語言偏好解析模組）
+- 新增 `tests/unit/test_flavor_parser.py`（36 個測試）
+- 修改 `distiller_scraper/cocktail_db.py`（新增 6 款雞尾酒，+390 行）
+- 修改 `distiller_scraper/recommender.py`（`avoid_flavors` 懲罰機制）
+- 修改 `bot.py`（刪除舊函式，改用新模組）
+- 修改 `tests/unit/test_recommender.py`（新增 3 個 avoid_flavors 測試）
+- **總計：446 個測試全數通過**
+
 ### 2026-03-17 | OpenCode Atlas Orchestrator
 
 **工作內容**：

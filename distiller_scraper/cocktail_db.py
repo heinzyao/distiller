@@ -61,7 +61,6 @@ def _ingredient(
 
 # ─── 雞尾酒知識庫 ─────────────────────────────────────────────
 COCKTAIL_DB: dict[str, dict] = {
-
     # ── Negroni ──────────────────────────────────────────────────
     "negroni": {
         "name": "Negroni",
@@ -69,16 +68,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "等比例琴酒 + Campari + 甜苦艾酒，苦甜平衡的義式經典",
         "flavor_style": "苦甜草本",
         "recipe": [
-            {"item": "琴酒",     "amount": "30ml"},
-            {"item": "Campari",  "amount": "30ml", "note": "苦橙利口酒，奠定苦味骨架"},
+            {"item": "琴酒", "amount": "30ml"},
+            {"item": "Campari", "amount": "30ml", "note": "苦橙利口酒，奠定苦味骨架"},
             {"item": "甜苦艾酒", "amount": "30ml", "note": "香草調，柔化苦澀"},
-            {"item": "橙皮",     "amount": "1 片",  "note": "裝飾"},
+            {"item": "橙皮", "amount": "1 片", "note": "裝飾"},
         ],
         "glassware": "老式杯（加冰）",
         "method": "攪拌法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="琴酒",
+                role=ROLE_BASE,
+                label="琴酒",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["gin"],
                 suitable_subtypes=["London Dry Gin", "Old Tom Gin", "Distilled Gin"],
@@ -88,7 +88,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 50),
             ),
             _ingredient(
-                role=ROLE_MODIFIER, label="苦味利口酒",
+                role=ROLE_MODIFIER,
+                label="苦味利口酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Amaro"],
@@ -102,7 +103,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 },
             ),
             _ingredient(
-                role=ROLE_VERMOUTH, label="甜型苦艾酒",
+                role=ROLE_VERMOUTH,
+                label="甜型苦艾酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Vermouth"],
@@ -117,7 +119,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Old Fashioned ────────────────────────────────────────────
     "old_fashioned": {
         "name": "Old Fashioned",
@@ -126,25 +127,33 @@ COCKTAIL_DB: dict[str, dict] = {
         "flavor_style": "濃郁辛香",
         "recipe": [
             {"item": "波本/裸麥威士忌", "amount": "60ml"},
-            {"item": "方糖",           "amount": "1 顆", "note": "或 1tsp 糖漿"},
+            {"item": "方糖", "amount": "1 顆", "note": "或 1tsp 糖漿"},
             {"item": "Angostura 苦精", "amount": "2 dash"},
-            {"item": "橙皮",           "amount": "1 片",  "note": "擠壓後入杯裝飾"},
+            {"item": "橙皮", "amount": "1 片", "note": "擠壓後入杯裝飾"},
         ],
         "glassware": "老式杯（加一顆大冰塊）",
         "method": "攪拌法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="威士忌",
+                role=ROLE_BASE,
+                label="威士忌",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["whiskey"],
                 suitable_subtypes=["Bourbon", "Rye", "Tennessee Whiskey"],
                 classic_subtypes=["Bourbon"],
                 unsuitable_subtypes=["Blended", "Canadian"],
-                ideal_flavors={"rich": 75, "sweet": 55, "spicy": 50, "vanilla": 60, "woody": 45},
+                ideal_flavors={
+                    "rich": 75,
+                    "sweet": 55,
+                    "spicy": 50,
+                    "vanilla": 60,
+                    "woody": 45,
+                },
                 abv_range=(40, 60),
             ),
             _ingredient(
-                role=ROLE_BITTER, label="芳香苦精",
+                role=ROLE_BITTER,
+                label="芳香苦精",
                 recommend_mode=MODE_STATIC_ONLY,
                 ideal_flavors={},
                 static_fallback={
@@ -156,7 +165,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Manhattan ────────────────────────────────────────────────
     "manhattan": {
         "name": "Manhattan",
@@ -164,16 +172,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "裸麥威士忌 + 甜苦艾酒 + 苦精，紐約風格的優雅經典",
         "flavor_style": "辛香甜潤",
         "recipe": [
-            {"item": "裸麥威士忌",    "amount": "60ml", "note": "Rye 為傳統首選"},
-            {"item": "甜苦艾酒",     "amount": "30ml"},
+            {"item": "裸麥威士忌", "amount": "60ml", "note": "Rye 為傳統首選"},
+            {"item": "甜苦艾酒", "amount": "30ml"},
             {"item": "Angostura 苦精", "amount": "2 dash"},
-            {"item": "黑櫻桃",       "amount": "1 顆",  "note": "裝飾"},
+            {"item": "黑櫻桃", "amount": "1 顆", "note": "裝飾"},
         ],
         "glassware": "馬丁尼杯（無冰）",
         "method": "攪拌法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="裸麥/波本威士忌",
+                role=ROLE_BASE,
+                label="裸麥/波本威士忌",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["whiskey"],
                 suitable_subtypes=["Rye", "Bourbon"],
@@ -182,7 +191,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 55),
             ),
             _ingredient(
-                role=ROLE_VERMOUTH, label="甜型苦艾酒",
+                role=ROLE_VERMOUTH,
+                label="甜型苦艾酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Vermouth"],
@@ -191,12 +201,16 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(15, 20),
                 static_fallback={
                     "name": "Carpano Antica Formula",
-                    "alternatives": ["Martini Rosso", "Cocchi Storico Vermouth di Torino"],
+                    "alternatives": [
+                        "Martini Rosso",
+                        "Cocchi Storico Vermouth di Torino",
+                    ],
                     "note": "選用香草調性較重的甜苦艾，與裸麥辛香形成對比",
                 },
             ),
             _ingredient(
-                role=ROLE_BITTER, label="芳香苦精",
+                role=ROLE_BITTER,
+                label="芳香苦精",
                 recommend_mode=MODE_STATIC_ONLY,
                 ideal_flavors={},
                 static_fallback={
@@ -206,7 +220,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Martini ──────────────────────────────────────────────────
     "martini": {
         "name": "Martini",
@@ -214,7 +227,7 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "琴酒 + 不甜苦艾酒，以比例決定乾燥程度",
         "flavor_style": "清爽草本",
         "recipe": [
-            {"item": "琴酒",     "amount": "60ml"},
+            {"item": "琴酒", "amount": "60ml"},
             {"item": "不甜苦艾酒", "amount": "10ml", "note": "比例 6:1（Dry Martini）"},
             {"item": "橄欖或檸檬皮", "amount": "1 個", "note": "裝飾，決定風格走向"},
         ],
@@ -222,7 +235,8 @@ COCKTAIL_DB: dict[str, dict] = {
         "method": "攪拌法（或 shaken，視偏好）",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="琴酒",
+                role=ROLE_BASE,
+                label="琴酒",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["gin"],
                 suitable_subtypes=["London Dry Gin", "Distilled Gin"],
@@ -232,7 +246,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 50),
             ),
             _ingredient(
-                role=ROLE_VERMOUTH, label="不甜苦艾酒",
+                role=ROLE_VERMOUTH,
+                label="不甜苦艾酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Vermouth"],
@@ -247,7 +262,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Daiquiri ─────────────────────────────────────────────────
     "daiquiri": {
         "name": "Daiquiri",
@@ -255,15 +269,16 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "白蘭姆 + 萊姆汁 + 糖，展現蘭姆酒純粹風味的古巴經典",
         "flavor_style": "清爽果酸",
         "recipe": [
-            {"item": "白蘭姆",    "amount": "60ml", "note": "Silver Rum 最能展現純淨風味"},
+            {"item": "白蘭姆", "amount": "60ml", "note": "Silver Rum 最能展現純淨風味"},
             {"item": "現榨萊姆汁", "amount": "22ml", "note": "必須新鮮現榨"},
-            {"item": "糖漿",      "amount": "15ml"},
+            {"item": "糖漿", "amount": "15ml"},
         ],
         "glassware": "雞尾酒杯（無冰）",
         "method": "搖盪法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="白蘭姆",
+                role=ROLE_BASE,
+                label="白蘭姆",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["rum"],
                 suitable_subtypes=["Silver Rum"],
@@ -273,7 +288,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(37, 46),
             ),
             _ingredient(
-                role=ROLE_MIXER, label="現榨萊姆汁",
+                role=ROLE_MIXER,
+                label="現榨萊姆汁",
                 recommend_mode=MODE_STATIC_ONLY,
                 ideal_flavors={},
                 static_fallback={
@@ -284,7 +300,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Margarita ────────────────────────────────────────────────
     "margarita": {
         "name": "Margarita",
@@ -293,26 +308,32 @@ COCKTAIL_DB: dict[str, dict] = {
         "flavor_style": "活潑果酸",
         "recipe": [
             {"item": "龍舌蘭（Blanco）", "amount": "50ml", "note": "Blanco 最為經典"},
-            {"item": "橙味利口酒",       "amount": "25ml", "note": "Cointreau 為標準"},
-            {"item": "現榨萊姆汁",       "amount": "25ml"},
-            {"item": "鹽口",            "amount": "適量",  "note": "杯口裝飾（可省略）"},
+            {"item": "橙味利口酒", "amount": "25ml", "note": "Cointreau 為標準"},
+            {"item": "現榨萊姆汁", "amount": "25ml"},
+            {"item": "鹽口", "amount": "適量", "note": "杯口裝飾（可省略）"},
         ],
         "glassware": "瑪格麗特杯或老式杯",
         "method": "搖盪法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="龍舌蘭",
+                role=ROLE_BASE,
+                label="龍舌蘭",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["tequila-mezcal"],
-                suitable_subtypes=["Tequila Blanco", "Tequila Reposado",
-                                   "Blanco Tequila", "Reposado Tequila"],
+                suitable_subtypes=[
+                    "Tequila Blanco",
+                    "Tequila Reposado",
+                    "Blanco Tequila",
+                    "Reposado Tequila",
+                ],
                 classic_subtypes=["Tequila Blanco", "Blanco Tequila"],
                 unsuitable_subtypes=["Mezcal", "Mezcal Añejo"],
                 ideal_flavors={"fruity": 55, "herbal": 45, "spicy": 35, "tart": 30},
                 abv_range=(38, 46),
             ),
             _ingredient(
-                role=ROLE_LIQUEUR, label="橙味利口酒",
+                role=ROLE_LIQUEUR,
+                label="橙味利口酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Triple Sec/Curaçao"],
@@ -321,13 +342,16 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(30, 45),
                 static_fallback={
                     "name": "Cointreau",
-                    "alternatives": ["Pierre Ferrand Dry Curaçao（DB 有收錄，評分 96）",
-                                     "Grand Marnier（較甜）"],
+                    "alternatives": [
+                        "Pierre Ferrand Dry Curaçao（DB 有收錄，評分 96）",
+                        "Grand Marnier（較甜）",
+                    ],
                     "note": "橙皮精油香氣，提升整體複雜度",
                 },
             ),
             _ingredient(
-                role=ROLE_MIXER, label="現榨萊姆汁",
+                role=ROLE_MIXER,
+                label="現榨萊姆汁",
                 recommend_mode=MODE_STATIC_ONLY,
                 ideal_flavors={},
                 static_fallback={
@@ -337,7 +361,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Whiskey Sour ─────────────────────────────────────────────
     "whiskey_sour": {
         "name": "Whiskey Sour",
@@ -345,16 +368,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "波本威士忌 + 檸檬汁 + 糖，加蛋白可做 Boston Sour",
         "flavor_style": "酸甜濃郁",
         "recipe": [
-            {"item": "波本威士忌",  "amount": "60ml"},
-            {"item": "新鮮檸檬汁",  "amount": "22ml"},
-            {"item": "糖漿",       "amount": "15ml"},
-            {"item": "蛋白",       "amount": "1 個（選用）", "note": "加入即為 Boston Sour"},
+            {"item": "波本威士忌", "amount": "60ml"},
+            {"item": "新鮮檸檬汁", "amount": "22ml"},
+            {"item": "糖漿", "amount": "15ml"},
+            {"item": "蛋白", "amount": "1 個（選用）", "note": "加入即為 Boston Sour"},
         ],
         "glassware": "岩石杯或酸酒杯",
         "method": "搖盪法（加蛋白需乾搖）",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="波本威士忌",
+                role=ROLE_BASE,
+                label="波本威士忌",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["whiskey"],
                 suitable_subtypes=["Bourbon", "Rye", "American Single Malt"],
@@ -363,14 +387,14 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 55),
             ),
             _ingredient(
-                role=ROLE_MIXER, label="新鮮檸檬汁",
+                role=ROLE_MIXER,
+                label="新鮮檸檬汁",
                 recommend_mode=MODE_STATIC_ONLY,
                 ideal_flavors={},
                 static_fallback={"name": "新鮮檸檬汁", "usage": "3/4 oz"},
             ),
         ],
     },
-
     # ── Mojito ───────────────────────────────────────────────────
     "mojito": {
         "name": "Mojito",
@@ -378,17 +402,18 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "白蘭姆 + 薄荷 + 萊姆 + 糖 + 氣泡水，古巴夏日清爽飲",
         "flavor_style": "清爽薄荷",
         "recipe": [
-            {"item": "白蘭姆",  "amount": "50ml", "note": "Silver Rum 保持清爽"},
+            {"item": "白蘭姆", "amount": "50ml", "note": "Silver Rum 保持清爽"},
             {"item": "新鮮薄荷", "amount": "10 片", "note": "輕壓不研磨，避免苦澀"},
-            {"item": "萊姆",    "amount": "半顆",  "note": "切塊搾入"},
-            {"item": "糖漿",    "amount": "15ml"},
-            {"item": "氣泡水",  "amount": "適量",  "note": "最後補入"},
+            {"item": "萊姆", "amount": "半顆", "note": "切塊搾入"},
+            {"item": "糖漿", "amount": "15ml"},
+            {"item": "氣泡水", "amount": "適量", "note": "最後補入"},
         ],
         "glassware": "高球杯（加碎冰）",
         "method": "搗壓法 + 直調",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="白蘭姆",
+                role=ROLE_BASE,
+                label="白蘭姆",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["rum"],
                 suitable_subtypes=["Silver Rum"],
@@ -399,7 +424,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Gimlet ───────────────────────────────────────────────────
     "gimlet": {
         "name": "Gimlet",
@@ -407,14 +431,19 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "琴酒 + 萊姆汁（或萊姆糖漿），簡約清新的英式古典",
         "flavor_style": "清新酸甜",
         "recipe": [
-            {"item": "琴酒",      "amount": "60ml"},
-            {"item": "Rose's 萊姆糖漿", "amount": "15ml", "note": "傳統版；現代版改用新鮮萊姆汁+糖"},
+            {"item": "琴酒", "amount": "60ml"},
+            {
+                "item": "Rose's 萊姆糖漿",
+                "amount": "15ml",
+                "note": "傳統版；現代版改用新鮮萊姆汁+糖",
+            },
         ],
         "glassware": "雞尾酒杯（無冰）",
         "method": "搖盪法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="琴酒",
+                role=ROLE_BASE,
+                label="琴酒",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["gin"],
                 suitable_subtypes=["London Dry Gin", "Modern Gin", "Distilled Gin"],
@@ -425,7 +454,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Cosmopolitan ─────────────────────────────────────────────
     "cosmopolitan": {
         "name": "Cosmopolitan",
@@ -433,17 +461,18 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "伏特加 + 橙味利口酒 + 蔓越莓汁 + 萊姆，都市感粉紅色雞尾酒",
         "flavor_style": "果香甜酸",
         "recipe": [
-            {"item": "伏特加",    "amount": "40ml"},
+            {"item": "伏特加", "amount": "40ml"},
             {"item": "橙味利口酒", "amount": "15ml", "note": "Cointreau 為標準"},
-            {"item": "蔓越莓汁",  "amount": "30ml"},
+            {"item": "蔓越莓汁", "amount": "30ml"},
             {"item": "現榨萊姆汁", "amount": "15ml"},
-            {"item": "橙皮",     "amount": "1 片",  "note": "裝飾"},
+            {"item": "橙皮", "amount": "1 片", "note": "裝飾"},
         ],
         "glassware": "馬丁尼杯（無冰）",
         "method": "搖盪法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="伏特加",
+                role=ROLE_BASE,
+                label="伏特加",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["vodka"],
                 suitable_subtypes=["Unflavored Vodka"],
@@ -453,7 +482,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(37, 45),
             ),
             _ingredient(
-                role=ROLE_LIQUEUR, label="橙味利口酒",
+                role=ROLE_LIQUEUR,
+                label="橙味利口酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Triple Sec/Curaçao"],
@@ -466,7 +496,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Moscow Mule ──────────────────────────────────────────────
     "moscow_mule": {
         "name": "Moscow Mule",
@@ -474,16 +503,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "伏特加 + 薑汁啤酒 + 萊姆，銅杯盛裝的辛辣清爽飲",
         "flavor_style": "辛辣清爽",
         "recipe": [
-            {"item": "伏特加",  "amount": "50ml", "note": "中性清爽款為佳"},
+            {"item": "伏特加", "amount": "50ml", "note": "中性清爽款為佳"},
             {"item": "薑汁啤酒", "amount": "100ml"},
-            {"item": "萊姆汁",  "amount": "15ml"},
-            {"item": "萊姆角",  "amount": "1 塊",  "note": "裝飾"},
+            {"item": "萊姆汁", "amount": "15ml"},
+            {"item": "萊姆角", "amount": "1 塊", "note": "裝飾"},
         ],
         "glassware": "銅杯（加冰）",
         "method": "直調法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="伏特加",
+                role=ROLE_BASE,
+                label="伏特加",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["vodka"],
                 suitable_subtypes=["Unflavored Vodka"],
@@ -493,7 +523,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Aperol Spritz ────────────────────────────────────────────
     "aperol_spritz": {
         "name": "Aperol Spritz",
@@ -501,16 +530,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "Aperol + 普賽克氣泡酒 + 氣泡水，義大利開胃酒代表",
         "flavor_style": "苦橙輕盈",
         "recipe": [
-            {"item": "Aperol",    "amount": "90ml"},
+            {"item": "Aperol", "amount": "90ml"},
             {"item": "普賽克氣泡酒", "amount": "60ml"},
-            {"item": "氣泡水",    "amount": "30ml"},
-            {"item": "橙片",      "amount": "1 片",  "note": "裝飾"},
+            {"item": "氣泡水", "amount": "30ml"},
+            {"item": "橙片", "amount": "1 片", "note": "裝飾"},
         ],
         "glassware": "大型紅酒杯（加冰）",
         "method": "直調法（3-2-1 比例）",
         "ingredients": [
             _ingredient(
-                role=ROLE_MODIFIER, label="苦味開胃酒",
+                role=ROLE_MODIFIER,
+                label="苦味開胃酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Amaro"],
@@ -525,7 +555,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Paloma ───────────────────────────────────────────────────
     "paloma": {
         "name": "Paloma",
@@ -534,26 +563,34 @@ COCKTAIL_DB: dict[str, dict] = {
         "flavor_style": "苦甜果香",
         "recipe": [
             {"item": "龍舌蘭（Blanco）", "amount": "50ml"},
-            {"item": "葡萄柚氣泡飲（Squirt）", "amount": "150ml", "note": "或新鮮葡萄柚汁+氣泡水"},
-            {"item": "萊姆汁",  "amount": "15ml"},
-            {"item": "鹽口",    "amount": "適量",  "note": "杯口裝飾（可省略）"},
+            {
+                "item": "葡萄柚氣泡飲（Squirt）",
+                "amount": "150ml",
+                "note": "或新鮮葡萄柚汁+氣泡水",
+            },
+            {"item": "萊姆汁", "amount": "15ml"},
+            {"item": "鹽口", "amount": "適量", "note": "杯口裝飾（可省略）"},
         ],
         "glassware": "高球杯（加冰）",
         "method": "直調法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="龍舌蘭",
+                role=ROLE_BASE,
+                label="龍舌蘭",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["tequila-mezcal"],
-                suitable_subtypes=["Tequila Blanco", "Tequila Reposado",
-                                   "Blanco Tequila", "Reposado Tequila"],
+                suitable_subtypes=[
+                    "Tequila Blanco",
+                    "Tequila Reposado",
+                    "Blanco Tequila",
+                    "Reposado Tequila",
+                ],
                 classic_subtypes=["Tequila Blanco", "Blanco Tequila"],
                 ideal_flavors={"fruity": 50, "herbal": 40, "spicy": 30, "tart": 40},
                 abv_range=(38, 46),
             ),
         ],
     },
-
     # ── Sidecar ──────────────────────────────────────────────────
     "sidecar": {
         "name": "Sidecar",
@@ -561,16 +598,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "干邑白蘭地 + 橙味利口酒 + 檸檬汁，法式優雅調酒",
         "flavor_style": "果香優雅",
         "recipe": [
-            {"item": "干邑白蘭地",  "amount": "50ml", "note": "VSOP 以上等級為佳"},
+            {"item": "干邑白蘭地", "amount": "50ml", "note": "VSOP 以上等級為佳"},
             {"item": "橙味利口酒", "amount": "20ml", "note": "Cointreau 為標準"},
             {"item": "新鮮檸檬汁", "amount": "20ml"},
-            {"item": "糖口",      "amount": "適量",  "note": "杯口裝飾（可省略）"},
+            {"item": "糖口", "amount": "適量", "note": "杯口裝飾（可省略）"},
         ],
         "glassware": "雞尾酒杯（無冰）",
         "method": "搖盪法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="干邑白蘭地",
+                role=ROLE_BASE,
+                label="干邑白蘭地",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["brandy"],
                 suitable_subtypes=["Cognac"],
@@ -579,7 +617,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 50),
             ),
             _ingredient(
-                role=ROLE_LIQUEUR, label="橙味利口酒",
+                role=ROLE_LIQUEUR,
+                label="橙味利口酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Triple Sec/Curaçao"],
@@ -592,7 +631,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Last Word ────────────────────────────────────────────────
     "last_word": {
         "name": "Last Word",
@@ -600,16 +638,21 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "等比例琴酒 + 夏翠絲 + 黑櫻桃利口酒 + 萊姆汁，禁酒令時代復古傑作",
         "flavor_style": "草本花香複雜",
         "recipe": [
-            {"item": "琴酒",         "amount": "22ml"},
-            {"item": "Green Chartreuse", "amount": "22ml", "note": "130 種草本，不可替換"},
+            {"item": "琴酒", "amount": "22ml"},
+            {
+                "item": "Green Chartreuse",
+                "amount": "22ml",
+                "note": "130 種草本，不可替換",
+            },
             {"item": "Luxardo Maraschino", "amount": "22ml"},
-            {"item": "現榨萊姆汁",  "amount": "22ml"},
+            {"item": "現榨萊姆汁", "amount": "22ml"},
         ],
         "glassware": "雞尾酒杯（無冰）",
         "method": "搖盪法（等比例 4 種）",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="琴酒",
+                role=ROLE_BASE,
+                label="琴酒",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["gin"],
                 suitable_subtypes=["London Dry Gin", "Distilled Gin"],
@@ -618,7 +661,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 48),
             ),
             _ingredient(
-                role=ROLE_LIQUEUR, label="綠夏翠絲",
+                role=ROLE_LIQUEUR,
+                label="綠夏翠絲",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Herbal/Spice Liqueurs"],
@@ -631,7 +675,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 },
             ),
             _ingredient(
-                role=ROLE_LIQUEUR, label="黑櫻桃利口酒",
+                role=ROLE_LIQUEUR,
+                label="黑櫻桃利口酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Other Liqueurs"],
@@ -644,7 +689,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Paper Plane ──────────────────────────────────────────────
     "paper_plane": {
         "name": "Paper Plane",
@@ -652,16 +696,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "等比例波本 + Aperol + Amaro Nonino + 檸檬汁，現代經典",
         "flavor_style": "苦甜辛香平衡",
         "recipe": [
-            {"item": "波本威士忌",         "amount": "22ml"},
-            {"item": "Aperol",           "amount": "22ml"},
-            {"item": "Amaro Nonino",     "amount": "22ml", "note": "草本葡萄渣基底"},
-            {"item": "新鮮檸檬汁",         "amount": "22ml"},
+            {"item": "波本威士忌", "amount": "22ml"},
+            {"item": "Aperol", "amount": "22ml"},
+            {"item": "Amaro Nonino", "amount": "22ml", "note": "草本葡萄渣基底"},
+            {"item": "新鮮檸檬汁", "amount": "22ml"},
         ],
         "glassware": "雞尾酒杯（無冰）",
         "method": "搖盪法（等比例 4 種）",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="波本威士忌",
+                role=ROLE_BASE,
+                label="波本威士忌",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["whiskey"],
                 suitable_subtypes=["Bourbon"],
@@ -670,7 +715,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 55),
             ),
             _ingredient(
-                role=ROLE_MODIFIER, label="苦橙開胃酒",
+                role=ROLE_MODIFIER,
+                label="苦橙開胃酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Amaro"],
@@ -679,7 +725,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 static_fallback={"name": "Aperol"},
             ),
             _ingredient(
-                role=ROLE_LIQUEUR, label="草本阿瑪羅",
+                role=ROLE_LIQUEUR,
+                label="草本阿瑪羅",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Amaro"],
@@ -692,7 +739,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Penicillin ───────────────────────────────────────────────
     "penicillin": {
         "name": "Penicillin",
@@ -701,15 +747,20 @@ COCKTAIL_DB: dict[str, dict] = {
         "flavor_style": "煙燻蜂蜜薑香",
         "recipe": [
             {"item": "調和蘇格蘭威士忌", "amount": "50ml", "note": "作為基底"},
-            {"item": "薑汁蜂蜜糖漿",    "amount": "22ml"},
-            {"item": "新鮮檸檬汁",      "amount": "22ml"},
-            {"item": "泥煤單一麥芽",    "amount": "15ml", "note": "浮在上層，Islay 單麥為佳"},
+            {"item": "薑汁蜂蜜糖漿", "amount": "22ml"},
+            {"item": "新鮮檸檬汁", "amount": "22ml"},
+            {
+                "item": "泥煤單一麥芽",
+                "amount": "15ml",
+                "note": "浮在上層，Islay 單麥為佳",
+            },
         ],
         "glassware": "老式杯（加冰）",
         "method": "搖盪法（基底），浮層用量酒器輕覆",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="調和蘇格蘭威士忌（基底）",
+                role=ROLE_BASE,
+                label="調和蘇格蘭威士忌（基底）",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["whiskey"],
                 suitable_subtypes=["Blended"],
@@ -718,7 +769,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 46),
             ),
             _ingredient(
-                role=ROLE_BASE, label="泥煤單一麥芽（浮層）",
+                role=ROLE_BASE,
+                label="泥煤單一麥芽（浮層）",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["whiskey"],
                 suitable_subtypes=["Single Malt"],
@@ -728,7 +780,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Dark & Stormy ────────────────────────────────────────────
     "dark_and_stormy": {
         "name": "Dark & Stormy",
@@ -736,15 +787,20 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "深色蘭姆 + 薑汁啤酒，百慕達傳統飲",
         "flavor_style": "焦糖辛辣",
         "recipe": [
-            {"item": "深色蘭姆（Gosling's Black Seal）", "amount": "50ml", "note": "百慕達官方指定"},
-            {"item": "薑汁啤酒",                        "amount": "100ml"},
-            {"item": "萊姆角",                          "amount": "1 塊", "note": "裝飾"},
+            {
+                "item": "深色蘭姆（Gosling's Black Seal）",
+                "amount": "50ml",
+                "note": "百慕達官方指定",
+            },
+            {"item": "薑汁啤酒", "amount": "100ml"},
+            {"item": "萊姆角", "amount": "1 塊", "note": "裝飾"},
         ],
         "glassware": "高球杯（加冰）",
         "method": "直調法（先倒薑汁，蘭姆浮上層）",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="深色/陳年蘭姆",
+                role=ROLE_BASE,
+                label="深色/陳年蘭姆",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["rum"],
                 suitable_subtypes=["Dark Rum", "Aged Rum", "Gold Rum"],
@@ -755,7 +811,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── French 75 ────────────────────────────────────────────────
     "french_75": {
         "name": "French 75",
@@ -763,16 +818,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "琴酒 + 檸檬汁 + 糖 + 香檳，節慶感十足的氣泡調酒",
         "flavor_style": "清新氣泡花香",
         "recipe": [
-            {"item": "琴酒",   "amount": "30ml"},
+            {"item": "琴酒", "amount": "30ml"},
             {"item": "新鮮檸檬汁", "amount": "15ml"},
-            {"item": "糖漿",   "amount": "10ml"},
-            {"item": "香檳",   "amount": "60ml", "note": "最後補入，Brut 款為佳"},
+            {"item": "糖漿", "amount": "10ml"},
+            {"item": "香檳", "amount": "60ml", "note": "最後補入，Brut 款為佳"},
         ],
         "glassware": "香檳杯或笛型杯",
         "method": "搖盪法（前三種），香檳最後直調補入",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="琴酒",
+                role=ROLE_BASE,
+                label="琴酒",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["gin"],
                 suitable_subtypes=["London Dry Gin", "Modern Gin"],
@@ -782,7 +838,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Singapore Sling ──────────────────────────────────────────
     "singapore_sling": {
         "name": "Singapore Sling",
@@ -790,20 +845,21 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "琴酒 + 櫻桃白蘭地 + 君度 + 菠蘿汁等，來自萊佛士酒店的異國長飲",
         "flavor_style": "熱帶果香複雜",
         "recipe": [
-            {"item": "琴酒",         "amount": "30ml"},
+            {"item": "琴酒", "amount": "30ml"},
             {"item": "Heering 櫻桃利口酒", "amount": "15ml"},
             {"item": "君度/Triple Sec", "amount": "7.5ml"},
             {"item": "Bénédictine", "amount": "7.5ml"},
-            {"item": "新鮮鳳梨汁",   "amount": "120ml"},
-            {"item": "萊姆汁",       "amount": "15ml"},
-            {"item": "紅石榴糖漿",   "amount": "10ml"},
+            {"item": "新鮮鳳梨汁", "amount": "120ml"},
+            {"item": "萊姆汁", "amount": "15ml"},
+            {"item": "紅石榴糖漿", "amount": "10ml"},
             {"item": "Angostura 苦精", "amount": "1 dash"},
         ],
         "glassware": "颶風杯或高球杯（加冰）",
         "method": "搖盪法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="琴酒",
+                role=ROLE_BASE,
+                label="琴酒",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["gin"],
                 suitable_subtypes=["London Dry Gin"],
@@ -812,7 +868,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 47),
             ),
             _ingredient(
-                role=ROLE_LIQUEUR, label="櫻桃利口酒",
+                role=ROLE_LIQUEUR,
+                label="櫻桃利口酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Other Liqueurs"],
@@ -825,7 +882,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Sazerac ──────────────────────────────────────────────────
     "sazerac": {
         "name": "Sazerac",
@@ -833,17 +889,18 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "裸麥威士忌 + 苦精 + 艾碧斯漱口，紐奧良最古老的雞尾酒",
         "flavor_style": "辛香草本苦甜",
         "recipe": [
-            {"item": "裸麥威士忌",       "amount": "60ml"},
-            {"item": "方糖",             "amount": "1 顆"},
-            {"item": "Peychaud's 苦精",  "amount": "3 dash"},
+            {"item": "裸麥威士忌", "amount": "60ml"},
+            {"item": "方糖", "amount": "1 顆"},
+            {"item": "Peychaud's 苦精", "amount": "3 dash"},
             {"item": "Absinthe（艾碧斯）", "amount": "少許", "note": "漱口杯壁後倒掉"},
-            {"item": "檸檬皮",           "amount": "1 片",  "note": "擠壓後棄置或裝飾"},
+            {"item": "檸檬皮", "amount": "1 片", "note": "擠壓後棄置或裝飾"},
         ],
         "glassware": "老式杯（無冰，預冷）",
         "method": "攪拌法",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="裸麥威士忌",
+                role=ROLE_BASE,
+                label="裸麥威士忌",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["whiskey"],
                 suitable_subtypes=["Rye"],
@@ -852,7 +909,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(40, 55),
             ),
             _ingredient(
-                role=ROLE_BITTER, label="苦精",
+                role=ROLE_BITTER,
+                label="苦精",
                 recommend_mode=MODE_STATIC_ONLY,
                 ideal_flavors={},
                 static_fallback={
@@ -863,7 +921,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Pisco Sour ───────────────────────────────────────────────
     "pisco_sour": {
         "name": "Pisco Sour",
@@ -871,17 +928,18 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "秘魯/智利皮斯可 + 萊姆汁 + 糖 + 蛋白 + 苦精",
         "flavor_style": "花果酸甜輕盈",
         "recipe": [
-            {"item": "Pisco",     "amount": "60ml", "note": "秘魯 Quebranta 最為經典"},
+            {"item": "Pisco", "amount": "60ml", "note": "秘魯 Quebranta 最為經典"},
             {"item": "新鮮萊姆汁", "amount": "30ml"},
-            {"item": "糖漿",      "amount": "20ml"},
-            {"item": "蛋白",      "amount": "1 個"},
+            {"item": "糖漿", "amount": "20ml"},
+            {"item": "蛋白", "amount": "1 個"},
             {"item": "Angostura 苦精", "amount": "3 滴", "note": "滴在泡沫上裝飾"},
         ],
         "glassware": "酸酒杯（無冰）",
         "method": "乾搖後加冰再搖",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="Pisco",
+                role=ROLE_BASE,
+                label="Pisco",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["brandy"],
                 suitable_subtypes=["Pisco"],
@@ -891,7 +949,6 @@ COCKTAIL_DB: dict[str, dict] = {
             ),
         ],
     },
-
     # ── Espresso Martini ─────────────────────────────────────────
     "espresso_martini": {
         "name": "Espresso Martini",
@@ -899,16 +956,17 @@ COCKTAIL_DB: dict[str, dict] = {
         "description": "伏特加 + 咖啡利口酒 + 濃縮咖啡，提神又優雅的派對飲品",
         "flavor_style": "咖啡苦甜",
         "recipe": [
-            {"item": "伏特加",   "amount": "40ml"},
+            {"item": "伏特加", "amount": "40ml"},
             {"item": "咖啡利口酒", "amount": "20ml", "note": "Mr Black 或 Kahlúa"},
             {"item": "濃縮咖啡", "amount": "30ml", "note": "新鮮萃取，趁熱搖盪"},
-            {"item": "咖啡豆",  "amount": "3 顆",  "note": "浮於泡沫上裝飾"},
+            {"item": "咖啡豆", "amount": "3 顆", "note": "浮於泡沫上裝飾"},
         ],
         "glassware": "馬丁尼杯（無冰）",
         "method": "搖盪法（用力搖出泡沫）",
         "ingredients": [
             _ingredient(
-                role=ROLE_BASE, label="伏特加",
+                role=ROLE_BASE,
+                label="伏特加",
                 recommend_mode=MODE_DYNAMIC,
                 categories=["vodka"],
                 suitable_subtypes=["Unflavored Vodka"],
@@ -917,7 +975,8 @@ COCKTAIL_DB: dict[str, dict] = {
                 abv_range=(37, 45),
             ),
             _ingredient(
-                role=ROLE_LIQUEUR, label="咖啡利口酒",
+                role=ROLE_LIQUEUR,
+                label="咖啡利口酒",
                 recommend_mode=MODE_DYNAMIC_OR_STATIC,
                 categories=["liqueurs-bitters"],
                 suitable_subtypes=["Coffee Liqueurs"],
@@ -929,6 +988,341 @@ COCKTAIL_DB: dict[str, dict] = {
                     "alternatives": ["Kahlúa（較甜）", "Tia Maria"],
                     "note": "Mr Black 已收錄於 DB（評分 96），優先推薦",
                 },
+            ),
+        ],
+    },
+    # ── Aviation ──────────────────────────────────────────────────
+    "aviation": {
+        "name": "Aviation",
+        "aliases": ["飛行"],
+        "description": "琴酒 + Maraschino + Crème de Violette + 檸檬汁，紫羅蘭色的禁酒令時代經典",
+        "flavor_style": "花香柔酸",
+        "recipe": [
+            {"item": "琴酒", "amount": "45ml"},
+            {"item": "Maraschino 利口酒", "amount": "15ml", "note": "Luxardo 為標準"},
+            {
+                "item": "Crème de Violette",
+                "amount": "7.5ml",
+                "note": "紫羅蘭利口酒，定義招牌色澤",
+            },
+            {"item": "現榨檸檬汁", "amount": "15ml"},
+            {"item": "黑櫻桃", "amount": "1 顆", "note": "裝飾"},
+        ],
+        "glassware": "雞尾酒杯（無冰）",
+        "method": "搖盪法",
+        "ingredients": [
+            _ingredient(
+                role=ROLE_BASE,
+                label="琴酒",
+                recommend_mode=MODE_DYNAMIC,
+                categories=["gin"],
+                suitable_subtypes=["London Dry Gin", "Distilled Gin"],
+                classic_subtypes=["London Dry Gin"],
+                unsuitable_subtypes=["Flavored Gin", "Barrel-Aged Gin"],
+                ideal_flavors={"juniper": 75, "herbal": 60, "floral": 50, "tart": 30},
+                abv_range=(40, 50),
+            ),
+            _ingredient(
+                role=ROLE_LIQUEUR,
+                label="Maraschino 利口酒",
+                recommend_mode=MODE_DYNAMIC_OR_STATIC,
+                categories=["liqueurs-bitters"],
+                suitable_subtypes=["Fruit Liqueurs"],
+                classic_subtypes=["Fruit Liqueurs"],
+                ideal_flavors={"sweet": 55, "fruity": 60, "nutty": 35, "floral": 30},
+                abv_range=(28, 35),
+                static_fallback={
+                    "name": "Luxardo Maraschino Liqueur",
+                    "alternatives": ["Maraska Maraschino"],
+                    "note": "黑櫻桃核蒸餾，帶杏仁和堅果風味",
+                },
+            ),
+            _ingredient(
+                role=ROLE_LIQUEUR,
+                label="紫羅蘭利口酒",
+                recommend_mode=MODE_DYNAMIC_OR_STATIC,
+                categories=["liqueurs-bitters"],
+                suitable_subtypes=["Floral Liqueurs"],
+                classic_subtypes=["Floral Liqueurs"],
+                ideal_flavors={"floral": 80, "sweet": 50, "fruity": 25},
+                abv_range=(15, 25),
+                static_fallback={
+                    "name": "Rothman & Winter Crème de Violette",
+                    "alternatives": [
+                        "Giffard Crème de Violette",
+                        "Tempus Fugit Liqueur de Violettes",
+                    ],
+                    "note": "用量宜少（7.5ml），僅提供淡紫色澤與花香",
+                },
+            ),
+        ],
+    },
+    # ── Vieux Carré ─────────────────────────────────────────────
+    "vieux_carre": {
+        "name": "Vieux Carré",
+        "aliases": ["老廣場", "維厄卡雷"],
+        "description": "裸麥威士忌 + 干邑 + 甜苦艾酒 + Bénédictine + 苦精，紐奧良多層次經典",
+        "flavor_style": "濃厚辛甜",
+        "recipe": [
+            {"item": "裸麥威士忌", "amount": "30ml"},
+            {"item": "干邑白蘭地", "amount": "30ml", "note": "VSOP 以上等級為佳"},
+            {"item": "甜苦艾酒", "amount": "30ml"},
+            {"item": "Bénédictine", "amount": "1 tsp", "note": "草本甜利口酒"},
+            {"item": "Peychaud's 苦精", "amount": "2 dash"},
+            {"item": "Angostura 苦精", "amount": "2 dash"},
+            {"item": "檸檬皮", "amount": "1 片", "note": "裝飾"},
+        ],
+        "glassware": "老式杯（加冰）",
+        "method": "攪拌法",
+        "ingredients": [
+            _ingredient(
+                role=ROLE_BASE,
+                label="裸麥威士忌",
+                recommend_mode=MODE_DYNAMIC,
+                categories=["whiskey"],
+                suitable_subtypes=["Rye", "Bourbon"],
+                classic_subtypes=["Rye"],
+                ideal_flavors={"spicy": 65, "rich": 55, "woody": 45, "sweet": 40},
+                abv_range=(40, 55),
+            ),
+            _ingredient(
+                role=ROLE_BASE,
+                label="干邑白蘭地",
+                recommend_mode=MODE_DYNAMIC_OR_STATIC,
+                categories=["brandy"],
+                suitable_subtypes=["Cognac"],
+                classic_subtypes=["Cognac"],
+                ideal_flavors={"fruity": 60, "rich": 65, "sweet": 55, "vanilla": 45},
+                abv_range=(40, 50),
+                static_fallback={
+                    "name": "Pierre Ferrand 1840",
+                    "alternatives": ["Hennessy VSOP", "Rémy Martin VSOP"],
+                    "note": "選用圓潤果香型干邑，與裸麥的辛辣形成互補",
+                },
+            ),
+            _ingredient(
+                role=ROLE_VERMOUTH,
+                label="甜型苦艾酒",
+                recommend_mode=MODE_DYNAMIC_OR_STATIC,
+                categories=["liqueurs-bitters"],
+                suitable_subtypes=["Vermouth"],
+                classic_subtypes=["Vermouth"],
+                ideal_flavors={"sweet": 60, "herbal": 55, "rich": 45},
+                abv_range=(15, 20),
+                static_fallback={
+                    "name": "Carpano Antica Formula",
+                    "alternatives": ["Cocchi Storico Vermouth di Torino"],
+                    "note": "香草調甜苦艾酒，為多基酒組合提供黏合層次",
+                },
+            ),
+            _ingredient(
+                role=ROLE_LIQUEUR,
+                label="Bénédictine",
+                recommend_mode=MODE_STATIC_ONLY,
+                ideal_flavors={},
+                static_fallback={
+                    "name": "Bénédictine D.O.M.",
+                    "usage": "1 tsp（約 5ml）",
+                    "note": "27 種草本配方，微量使用即可增添蜂蜜與香料複雜度",
+                },
+            ),
+            _ingredient(
+                role=ROLE_BITTER,
+                label="苦精（雙重）",
+                recommend_mode=MODE_STATIC_ONLY,
+                ideal_flavors={},
+                static_fallback={
+                    "name": "Peychaud's Bitters + Angostura Bitters",
+                    "usage": "各 2 dash",
+                    "note": "雙苦精是 Vieux Carré 的特色，缺一不可",
+                },
+            ),
+        ],
+    },
+    # ── Jungle Bird ─────────────────────────────────────────────
+    "jungle_bird": {
+        "name": "Jungle Bird",
+        "aliases": ["叢林鳥"],
+        "description": "黑蘭姆 + Campari + 鳳梨汁 + 萊姆汁 + 糖漿，熱帶苦甜的馬來西亞經典",
+        "flavor_style": "熱帶苦甜",
+        "recipe": [
+            {"item": "黑蘭姆", "amount": "45ml", "note": "Dark Rum 帶出焦糖深度"},
+            {"item": "Campari", "amount": "22ml"},
+            {"item": "鳳梨汁", "amount": "45ml", "note": "新鮮現榨為佳"},
+            {"item": "萊姆汁", "amount": "15ml"},
+            {"item": "紅糖糖漿", "amount": "15ml"},
+            {"item": "鳳梨葉", "amount": "1 片", "note": "裝飾"},
+        ],
+        "glassware": "老式杯或 Tiki 杯（加冰）",
+        "method": "搖盪法",
+        "ingredients": [
+            _ingredient(
+                role=ROLE_BASE,
+                label="黑蘭姆",
+                recommend_mode=MODE_DYNAMIC,
+                categories=["rum"],
+                suitable_subtypes=["Dark Rum", "Aged Rum"],
+                classic_subtypes=["Dark Rum"],
+                unsuitable_subtypes=["Silver Rum", "Flavored Rum"],
+                ideal_flavors={
+                    "rich": 70,
+                    "sweet": 60,
+                    "fruity": 50,
+                    "smoky": 25,
+                    "spicy": 30,
+                },
+                abv_range=(40, 50),
+            ),
+            _ingredient(
+                role=ROLE_MODIFIER,
+                label="苦味利口酒",
+                recommend_mode=MODE_DYNAMIC_OR_STATIC,
+                categories=["liqueurs-bitters"],
+                suitable_subtypes=["Bitter Liqueurs"],
+                classic_subtypes=["Bitter Liqueurs"],
+                ideal_flavors={"bitter": 85, "sweet": 35, "fruity": 50, "herbal": 45},
+                abv_range=(20, 30),
+                static_fallback={
+                    "name": "Campari",
+                    "alternatives": ["Contratto Bitter"],
+                    "note": "苦橙調性，與鳳梨的甜酸形成經典對比",
+                },
+            ),
+        ],
+    },
+    # ── Amaretto Sour ───────────────────────────────────────────
+    "amaretto_sour": {
+        "name": "Amaretto Sour",
+        "aliases": ["杏仁酸酒"],
+        "description": "Amaretto + 波本 + 檸檬汁 + 蛋白，利口酒為主角的酸甜經典",
+        "flavor_style": "杏仁酸甜",
+        "recipe": [
+            {"item": "Amaretto", "amount": "45ml", "note": "杏仁利口酒，主導風味"},
+            {
+                "item": "波本威士忌",
+                "amount": "22ml",
+                "note": "增添結構感，Jeffrey Morgenthaler 配方",
+            },
+            {"item": "現榨檸檬汁", "amount": "30ml"},
+            {"item": "糖漿", "amount": "1 tsp"},
+            {"item": "蛋白", "amount": "1 顆", "note": "搖出綿密泡沫（可省略）"},
+            {"item": "黑櫻桃", "amount": "1 顆", "note": "裝飾"},
+        ],
+        "glassware": "老式杯（加冰）",
+        "method": "搖盪法（先 dry shake 再加冰 wet shake）",
+        "ingredients": [
+            _ingredient(
+                role=ROLE_LIQUEUR,
+                label="Amaretto",
+                recommend_mode=MODE_DYNAMIC_OR_STATIC,
+                categories=["liqueurs-bitters"],
+                suitable_subtypes=["Amaro", "Fruit Liqueurs"],
+                classic_subtypes=["Amaro"],
+                ideal_flavors={"sweet": 70, "nutty": 75, "rich": 50, "fruity": 35},
+                abv_range=(24, 30),
+                static_fallback={
+                    "name": "Disaronno Originale",
+                    "alternatives": ["Lazzaroni Amaretto", "Gozio Amaretto"],
+                    "note": "杏仁核蒸餾，甜度高但不膩，是此調酒的靈魂",
+                },
+            ),
+            _ingredient(
+                role=ROLE_BASE,
+                label="波本威士忌",
+                recommend_mode=MODE_DYNAMIC,
+                categories=["whiskey"],
+                suitable_subtypes=["Bourbon"],
+                classic_subtypes=["Bourbon"],
+                ideal_flavors={"rich": 60, "sweet": 50, "vanilla": 55, "spicy": 35},
+                abv_range=(40, 50),
+            ),
+        ],
+    },
+    # ── B&B (Bénédictine & Brandy) ──────────────────────────────
+    "b_and_b": {
+        "name": "B&B",
+        "aliases": ["B&B", "Bénédictine & Brandy"],
+        "description": "干邑白蘭地 + Bénédictine，等比例的草本消化酒",
+        "flavor_style": "草本濃醇",
+        "recipe": [
+            {"item": "干邑白蘭地", "amount": "30ml", "note": "VSOP 以上等級為佳"},
+            {"item": "Bénédictine D.O.M.", "amount": "30ml", "note": "草本利口酒"},
+        ],
+        "glassware": "白蘭地杯或小型岩石杯（無冰或加一顆大冰塊）",
+        "method": "攪拌法（或直注法）",
+        "ingredients": [
+            _ingredient(
+                role=ROLE_BASE,
+                label="干邑白蘭地",
+                recommend_mode=MODE_DYNAMIC_OR_STATIC,
+                categories=["brandy"],
+                suitable_subtypes=["Cognac"],
+                classic_subtypes=["Cognac"],
+                ideal_flavors={
+                    "rich": 70,
+                    "fruity": 55,
+                    "sweet": 50,
+                    "vanilla": 45,
+                    "woody": 40,
+                },
+                abv_range=(40, 50),
+                static_fallback={
+                    "name": "Hennessy VSOP",
+                    "alternatives": ["Rémy Martin VSOP", "Pierre Ferrand Ambre"],
+                    "note": "選用圓潤果香型干邑，與 Bénédictine 的草本甜形成平衡",
+                },
+            ),
+            _ingredient(
+                role=ROLE_LIQUEUR,
+                label="Bénédictine",
+                recommend_mode=MODE_STATIC_ONLY,
+                ideal_flavors={},
+                static_fallback={
+                    "name": "Bénédictine D.O.M.",
+                    "usage": "30ml（等比例）",
+                    "note": "27 種草本與蜂蜜配方的法國修道院利口酒，無可替代",
+                },
+            ),
+        ],
+    },
+    # ── Tommy's Margarita ───────────────────────────────────────
+    "tommys_margarita": {
+        "name": "Tommy's Margarita",
+        "aliases": ["湯米瑪格麗特"],
+        "description": "龍舌蘭 + 萊姆汁 + 龍舌蘭糖漿，無橙味利口酒的純粹瑪格麗特",
+        "flavor_style": "龍舌蘭清爽",
+        "recipe": [
+            {"item": "龍舌蘭（Blanco）", "amount": "60ml", "note": "100% 龍舌蘭為佳"},
+            {"item": "現榨萊姆汁", "amount": "30ml"},
+            {
+                "item": "龍舌蘭糖漿",
+                "amount": "15ml",
+                "note": "Agave Nectar，比例 1:1 水稀釋",
+            },
+        ],
+        "glassware": "老式杯（加冰）",
+        "method": "搖盪法",
+        "ingredients": [
+            _ingredient(
+                role=ROLE_BASE,
+                label="龍舌蘭",
+                recommend_mode=MODE_DYNAMIC,
+                categories=["tequila-mezcal"],
+                suitable_subtypes=[
+                    "Tequila Blanco",
+                    "Tequila Reposado",
+                    "Blanco Tequila",
+                    "Reposado Tequila",
+                ],
+                classic_subtypes=["Tequila Blanco", "Blanco Tequila"],
+                ideal_flavors={
+                    "herbal": 55,
+                    "spicy": 40,
+                    "fruity": 45,
+                    "tart": 35,
+                    "sweet": 30,
+                },
+                abv_range=(38, 46),
             ),
         ],
     },
@@ -960,7 +1354,8 @@ def list_cocktails() -> list[str]:
 def get_dynamic_ingredients(cocktail: dict) -> list[dict]:
     """篩選出可從 DB 動態推薦的成分。"""
     return [
-        ing for ing in cocktail["ingredients"]
+        ing
+        for ing in cocktail["ingredients"]
         if ing["recommend_mode"] in (MODE_DYNAMIC, MODE_DYNAMIC_OR_STATIC)
         and ing["categories"]
     ]

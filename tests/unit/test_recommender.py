@@ -31,6 +31,7 @@ from distiller_scraper.cocktail_db import (
 
 # ─── cocktail_db 新欄位完整性 ──────────────────────────────────
 
+
 class TestCocktailDbNewFields:
     def test_all_cocktails_have_recipe(self):
         """每款雞尾酒都應有 recipe 欄位且至少 1 個項目。"""
@@ -100,6 +101,7 @@ class TestCocktailDbNewFields:
 
 # ─── 評分權重 ──────────────────────────────────────────────────
 
+
 class TestScoringWeights:
     def test_cocktail_flavor_weight_dominant(self):
         """W_COCKTAIL_FLAVOR 應為最大權重（≥ 0.55）。"""
@@ -115,7 +117,9 @@ class TestScoringWeights:
         assert abs(total - 1.0) < 1e-9
 
     def test_expert_score_weight_less_than_flavor(self):
-        assert CocktailRecommender.W_EXPERT_SCORE < CocktailRecommender.W_COCKTAIL_FLAVOR
+        assert (
+            CocktailRecommender.W_EXPERT_SCORE < CocktailRecommender.W_COCKTAIL_FLAVOR
+        )
 
     def test_classic_subtype_bonus_positive(self):
         assert CocktailRecommender.CLASSIC_SUBTYPE_BONUS > 0
@@ -123,8 +127,10 @@ class TestScoringWeights:
 
 # ─── classic 加分邏輯 ──────────────────────────────────────────
 
-def _make_candidate(spirit_type: str, expert_score: int = 90,
-                    flavors: dict | None = None) -> SpiritCandidate:
+
+def _make_candidate(
+    spirit_type: str, expert_score: int = 90, flavors: dict | None = None
+) -> SpiritCandidate:
     return SpiritCandidate(
         spirit_id=1,
         name="Test Spirit",
@@ -143,8 +149,9 @@ def _make_candidate(spirit_type: str, expert_score: int = 90,
 
 
 class TestClassicBonus:
-    def _score(self, spirit_type: str, classic_subtypes: list[str],
-               allow_twist: bool = False) -> float:
+    def _score(
+        self, spirit_type: str, classic_subtypes: list[str], allow_twist: bool = False
+    ) -> float:
         rec = CocktailRecommender.__new__(CocktailRecommender)
         rec.W_COCKTAIL_FLAVOR = CocktailRecommender.W_COCKTAIL_FLAVOR
         rec.W_USER_FLAVOR = CocktailRecommender.W_USER_FLAVOR
@@ -164,23 +171,49 @@ class TestClassicBonus:
         return candidates[0].score
 
     def test_classic_type_scores_higher(self):
-        classic_score = self._score("London Dry Gin", ["London Dry Gin"], allow_twist=False)
-        non_classic_score = self._score("Old Tom Gin", ["London Dry Gin"], allow_twist=False)
+        classic_score = self._score(
+            "London Dry Gin", ["London Dry Gin"], allow_twist=False
+        )
+        non_classic_score = self._score(
+            "Old Tom Gin", ["London Dry Gin"], allow_twist=False
+        )
         assert classic_score > non_classic_score
 
     def test_classic_bonus_equals_constant(self):
-        classic_score = self._score("London Dry Gin", ["London Dry Gin"], allow_twist=False)
-        non_classic_score = self._score("Old Tom Gin", ["London Dry Gin"], allow_twist=False)
-        assert abs((classic_score - non_classic_score) - CocktailRecommender.CLASSIC_SUBTYPE_BONUS) < 1e-6
+        classic_score = self._score(
+            "London Dry Gin", ["London Dry Gin"], allow_twist=False
+        )
+        non_classic_score = self._score(
+            "Old Tom Gin", ["London Dry Gin"], allow_twist=False
+        )
+        assert (
+            abs(
+                (classic_score - non_classic_score)
+                - CocktailRecommender.CLASSIC_SUBTYPE_BONUS
+            )
+            < 1e-6
+        )
 
     def test_twist_mode_disables_bonus(self):
-        score_no_twist = self._score("London Dry Gin", ["London Dry Gin"], allow_twist=False)
-        score_twist = self._score("London Dry Gin", ["London Dry Gin"], allow_twist=True)
+        score_no_twist = self._score(
+            "London Dry Gin", ["London Dry Gin"], allow_twist=False
+        )
+        score_twist = self._score(
+            "London Dry Gin", ["London Dry Gin"], allow_twist=True
+        )
         assert score_no_twist > score_twist
-        assert abs((score_no_twist - score_twist) - CocktailRecommender.CLASSIC_SUBTYPE_BONUS) < 1e-6
+        assert (
+            abs(
+                (score_no_twist - score_twist)
+                - CocktailRecommender.CLASSIC_SUBTYPE_BONUS
+            )
+            < 1e-6
+        )
 
     def test_empty_classic_subtypes_no_bonus(self):
-        score_with = self._score("London Dry Gin", ["London Dry Gin"], allow_twist=False)
+        score_with = self._score(
+            "London Dry Gin", ["London Dry Gin"], allow_twist=False
+        )
         score_without = self._score("London Dry Gin", [], allow_twist=False)
         assert score_with > score_without
 
@@ -208,6 +241,7 @@ class TestClassicBonus:
 
 
 # ─── format_recommendation 酒譜顯示 ───────────────────────────
+
 
 class TestFormatRecommendation:
     def _make_result(self, allow_twist: bool = False) -> CocktailRecommendation:
@@ -265,11 +299,14 @@ class TestFormatRecommendation:
 
 # ─── bot twist 關鍵字偵測 ──────────────────────────────────────
 
+
 class TestBotTwistDetection:
     def test_twist_keyword_detected(self):
         import bot
+
         # 模擬關鍵字偵測邏輯
         from bot import _TWIST_KEYWORDS
+
         for keyword in ["twist", "variation", "變化", "創意", "非傳統", "特色"]:
             assert any(k in keyword.lower() for k in _TWIST_KEYWORDS), (
                 f"關鍵字 '{keyword}' 未被偵測"
@@ -277,18 +314,92 @@ class TestBotTwistDetection:
 
     def test_normal_pref_not_twist(self):
         from bot import _TWIST_KEYWORDS
+
         pref = "喜歡花香清爽"
         result = any(k in pref.lower() for k in _TWIST_KEYWORDS)
         assert result is False
 
     def test_twist_in_pref_text(self):
         from bot import _TWIST_KEYWORDS
+
         pref = "想要 twist 版本"
         result = any(k in pref.lower() for k in _TWIST_KEYWORDS)
         assert result is True
 
     def test_variation_in_pref_text(self):
         from bot import _TWIST_KEYWORDS
+
         pref = "做 variation"
         result = any(k in pref.lower() for k in _TWIST_KEYWORDS)
         assert result is True
+
+
+# ─── avoid_flavors 懲罰測試 ───────────────────────────────────────
+
+
+@pytest.fixture
+def recommender():
+    """使用真實資料庫的推薦引擎實例。"""
+    rec = CocktailRecommender("distiller.db")
+    yield rec
+    rec.close()
+
+
+class TestAvoidFlavors:
+    """avoid_flavors 懲罰測試。"""
+
+    def test_avoid_penalty_applied(self, recommender):
+        """avoid sweet → 甜的烈酒 score 降低。"""
+        result_normal = recommender.recommend("Old Fashioned", top_k=10)
+        result_avoid = recommender.recommend(
+            "Old Fashioned", avoid_flavors={"sweet"}, top_k=10
+        )
+
+        assert result_normal is not None
+        assert result_avoid is not None
+
+        normal_scores = {}
+        for ing in result_normal.ingredients:
+            for c in ing.candidates:
+                if c.flavors.get("sweet", 0) > 50:
+                    normal_scores[c.spirit_id] = c.score
+
+        avoid_scores = {}
+        for ing in result_avoid.ingredients:
+            for c in ing.candidates:
+                if c.spirit_id in normal_scores:
+                    avoid_scores[c.spirit_id] = c.score
+
+        if avoid_scores:
+            for sid in avoid_scores:
+                assert avoid_scores[sid] < normal_scores[sid], (
+                    f"Spirit {sid} should have lower score with avoid_flavors"
+                )
+
+    def test_avoid_none_no_effect(self, recommender):
+        """avoid_flavors=None → 不影響評分（向後相容）。"""
+        result_none = recommender.recommend(
+            "Old Fashioned", avoid_flavors=None, top_k=3
+        )
+        result_default = recommender.recommend("Old Fashioned", top_k=3)
+
+        assert result_none is not None
+        assert result_default is not None
+
+        for ing_none, ing_default in zip(
+            result_none.ingredients, result_default.ingredients
+        ):
+            for c_none, c_default in zip(ing_none.candidates, ing_default.candidates):
+                assert c_none.score == c_default.score
+
+    def test_avoid_below_threshold_no_penalty(self, recommender):
+        """spirit below threshold (<=50) → 不被懲罰。"""
+        result = recommender.recommend(
+            "Old Fashioned", avoid_flavors={"sweet"}, top_k=10
+        )
+        assert result is not None
+
+        for ing in result.ingredients:
+            for c in ing.candidates:
+                if c.flavors.get("sweet", 0) <= 50:
+                    assert c.score_breakdown.get("avoid_penalty", 1.0) == 1.0
