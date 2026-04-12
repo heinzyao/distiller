@@ -102,52 +102,22 @@ Distiller 專案每日從 distiller.com 爬取烈酒評測資料（目前 2,840 
 
 ## 四、待辦項目
 
-### 🔴 高優先 — 資料補充
+### ✅ TODO-1 + TODO-2：利口酒資料補充（已完成，2026-04-12）
 
-#### TODO-1：執行 liqueurs-bitters 補充爬取
+**根本原因**：`?category=liqueurs-bitters` URL 參數被 distiller.com 靜默忽略，回傳全站排行榜而非利口酒分類。已修復為使用 `spirit_style_id` 子分類 ID（如 `?spirit_style_id=140` for Bitter Liqueurs）。
 
-**問題**：現有 DB 中利口酒類別僅 8 筆，Campari / Cointreau / 主流 Vermouth 全部缺失，造成相關雞尾酒成分退回靜態推薦。
+**成果**：新增 300 筆利口酒資料，關鍵品牌全數收錄：
 
-**根本原因**：`liqueurs-bitters` 在 full 模式中排最後，Chrome OOM 崩潰前從未爬到。
-**已修復**：T1 已將其移至第一位，下次排程（每日 02:00 台北時間）將自動補充。
+| 品牌 | 評分 | 狀態 |
+|------|------|------|
+| Campari | 90 | ✅ |
+| Aperol | 92 | ✅ |
+| Amaro Nonino Quintessentia | 90 | ✅ |
+| Luxardo Maraschino Liqueur | 92 | ✅ |
+| Grand Marnier | 88 | ✅ |
+| Pierre Ferrand Dry Curaçao | 96 | ✅（原已收錄）|
 
-**手動補充指令**（立即執行，無需等排程）：
-```bash
-uv run python scripts/supplement_liqueurs.py
-```
-
-**預期結果**：新增 100–300 筆利口酒 / 香甜酒 / 苦精 / 苦艾酒資料。
-
-**驗收條件**：
-```bash
-sqlite3 distiller.db "
-  SELECT spirit_type, COUNT(*) FROM spirits
-  WHERE spirit_type IN ('Amaro','Vermouth','Triple Sec/Curaçao',
-    'Herbal/Spice Liqueurs','Coffee Liqueurs','Other Liqueurs')
-  GROUP BY spirit_type;
-"
-# 預期：每類至少 20+ 筆，且 Campari / Cointreau 名稱出現在結果中
-```
-
----
-
-#### TODO-2：補爬後確認關鍵品牌覆蓋率
-
-執行補爬後，確認下列品牌是否收錄：
-
-| 品牌 | 用於 | 優先度 |
-|------|------|--------|
-| Campari | Negroni、Aperol Spritz、Paper Plane | 🔴 最高 |
-| Aperol | Aperol Spritz、Paper Plane | 🔴 最高 |
-| Cointreau / Triple Sec | Margarita、Cosmopolitan、Sidecar | 🔴 最高 |
-| Sweet Vermouth（多品牌）| Negroni、Manhattan | 🔴 最高 |
-| Dry Vermouth（多品牌）| Martini | 🟠 高 |
-| Green Chartreuse | Last Word | 🟠 高 |
-| Luxardo Maraschino | Last Word、Aviation | 🟠 高 |
-| Amaro Nonino | Paper Plane | 🟡 中 |
-| Heering Cherry Liqueur | Singapore Sling | 🟡 中 |
-
-**缺失品牌**應補充至 `cocktail_db.py` 的 `static_fallback` 欄位。
+**注意**：Cointreau、Sweet/Dry Vermouth 主流品牌在 distiller.com 上無評測資料（非台灣/獨立評分網站收錄範圍），仍走 static fallback，屬正常預期。
 
 ---
 
@@ -297,9 +267,9 @@ gcloud run jobs execute distiller-scraper --region=asia-east1 --project=amateur-
 ## 七、優先序總覽
 
 ```
-立即   TODO-1  執行 supplement_liqueurs.py 補充爬取
-       TODO-2  驗證關鍵利口酒品牌覆蓋率
-       TODO-8  deploy.yml 記憶體 2Gi → 4Gi
+立即   TODO-1  ✅ 執行 supplement_liqueurs.py 補充爬取（300 筆，2026-04-12）
+       TODO-2  ✅ 驗證關鍵利口酒品牌覆蓋率（Campari/Aperol/Nonino/Luxardo 全數收錄）
+       TODO-8  ✅ deploy.yml 記憶體 2Gi → 4Gi（commit c75a30d）
 
 短期   TODO-3  自然語言偏好解析強化
        TODO-4  Claude API 個人化推薦說明

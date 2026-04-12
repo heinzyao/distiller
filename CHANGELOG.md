@@ -2,6 +2,42 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.7.0] - 2026-04-12
+
+### 新增
+- **雞尾酒推薦系統**（`distiller_scraper/cocktail_db.py`、`distiller_scraper/recommender.py`）
+  - 支援 23 款經典雞尾酒：Negroni、Old Fashioned、Martini、Margarita 等
+  - 多成分覆蓋：基酒、利口酒、苦艾酒分別推薦
+  - 三層推薦模式（dynamic / dynamic_or_static / static_only）
+  - 風味向量評分：雞尾酒相似度（60%）+ 用戶偏好（25%）+ 評分（15%）
+  - LINE Bot 新指令：`雞尾酒 <名稱> [偏好]`
+
+- **Claude API 個人化推薦說明**（`distiller_scraper/recommender.py`）
+  - 設定 `ANTHROPIC_API_KEY` 後自動啟用
+  - 以 claude-haiku 為首選烈酒生成品酒師口吻說明（2-3 句，繁體中文）
+  - 無 key 或 API 失敗時靜默跳過，不影響主功能
+  - Cloud Run 啟用方式：先建立 Secret Manager secret，再手動執行
+    ```bash
+    echo -n "sk-ant-..." | gcloud secrets create DISTILLER_ANTHROPIC_API_KEY --data-file=- --project=<PROJECT_ID>
+    gcloud run services update distiller-bot --region asia-east1 \
+      --update-secrets ANTHROPIC_API_KEY=DISTILLER_ANTHROPIC_API_KEY:latest
+    ```
+
+- **利口酒子分類爬取**（`distiller_scraper/config.py`）
+  - 新增 `LIQUEURS_STYLES`：Bitter / Amaro / Anise / Coffee / Floral / Fruit / Herbal / Chocolate / Dairy 9 個子分類
+  - DB 利口酒資料從 8 筆 → 308 筆（含 Campari、Aperol、Amaro Nonino、Luxardo Maraschino）
+
+### 修復
+- **`?category=liqueurs-bitters` URL 參數失效**（`distiller_scraper/scraper.py`）
+  - distiller.com 已靜默忽略此參數，回傳全站排行榜
+  - 修復：改用 `?spirit_style_id=<id>` 子分類精確過濾
+- **`run.py` 成功判斷邏輯**：0 筆新增不再誤判為失敗（DB 已是最新屬正常）
+- **LINE 失敗通知**：scraper 拋出例外時通知訊息不再被跳過（commit `9bf5447`）
+
+### 資料
+- 資料庫總筆數：3,142 筆（+300 利口酒）
+- 測試：402 passed（+29 新增 test_recommender.py）
+
 ## [2.6.0] - 2026-03-17
 
 ### 新增

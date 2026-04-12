@@ -10,13 +10,15 @@ A Python web scraper project designed to extract liquor reviews and spirit profi
 
 ### Features
 
-- Supports scraping multiple categories including Whiskey, Gin, Rum, Vodka, Brandy, Tequila/Mezcal, and Liqueurs.
+- Supports scraping multiple categories including Whiskey, Gin, Rum, Vodka, Brandy, Tequila/Mezcal, and Liqueurs (9 sub-styles).
 - Extracts comprehensive data: scores, flavor profiles, tasting notes, etc.
 - Employs a Headless Chrome mode for stability and efficiency.
 - Smart pagination scraping with automatic end-condition detection.
 - Automatic API endpoint discovery, significantly boosting scraping speed.
 - Multiple storage backends: CSV / SQLite / Both combined.
-- 297 automated tests with GitHub Actions CI/CD pipelines.
+- **Cocktail Recommender**: multi-ingredient spirit recommendations for 23 classic cocktails with flavor-vector scoring.
+- **Claude API Integration**: optional AI-generated sommelier-style explanations for top recommendations.
+- 402 automated tests with GitHub Actions CI/CD pipelines.
 
 ### Project Structure
 
@@ -105,7 +107,7 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `help`
+Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `cocktail`, `help`
 
 ### Testing
 
@@ -221,13 +223,15 @@ MIT
 
 ### 功能特點
 
-- 支援 Whiskey、Gin、Rum、Vodka、Brandy、Tequila/Mezcal、Liqueurs 等多類別爬取
+- 支援 Whiskey、Gin、Rum、Vodka、Brandy、Tequila/Mezcal、Liqueurs（9 個子風格）等多類別爬取
 - 提取完整資料：評分、風味圖譜、品飲筆記等
 - Headless Chrome 模式，穩定高效
 - 智能分頁爬取，自動偵測停止條件
 - API 端點自動探索，大幅提升爬取速度
 - 多儲存後端：CSV / SQLite / 雙輸出
-- 297 個自動化測試，GitHub Actions CI/CD
+- **雞尾酒推薦引擎**：23 款經典雞尾酒多成分推薦，風味向量評分
+- **Claude API 整合**：可選的 AI 品酒師口吻個人化說明
+- 402 個自動化測試，GitHub Actions CI/CD
 
 ### 專案結構
 
@@ -316,7 +320,7 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`說明`
+支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`雞尾酒`、`說明`
 
 ### 測試
 

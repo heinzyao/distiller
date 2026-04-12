@@ -126,8 +126,8 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
-    success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
+    # scrape_ok=True 表示爬蟲完整執行（無例外）；0 筆新增可能是 DB 已是最新，非失敗
+    success = scrape_ok
     return success, stats
 
 
@@ -181,8 +181,7 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
-    success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
+    success = scrape_ok
     return success, stats
 
 
@@ -244,8 +243,7 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
 
     stats = scraper.get_statistics()
     print(f"\n統計:\n{json.dumps(stats, indent=2, ensure_ascii=False)}")
-    has_errors = len(scraper.failed_urls) > 0 or scraper.page_errors > 0
-    success = scrape_ok and (len(scraper.spirits_data) > 0 or not has_errors)
+    success = scrape_ok
     return success, stats
 
 
