@@ -2,6 +2,42 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.8.0] - 2026-04-12
+
+### 新增
+- **Difford's Guide 爬蟲**（`distiller_scraper/diffords_scraper.py`、`diffords_selectors.py`、`diffords_storage.py`）
+  - 輕量爬蟲（requests + BeautifulSoup，無需 Chrome，映像約 200 MB）
+  - Sitemap 驅動增量更新：比對 `lastmod` 決定是否重爬
+  - 3 層去重：`seen_urls` Set + `lastmod` 比對 + 168 小時執行視窗
+  - Schema.org JSON-LD 解析 + HTML 表格食材擷取（品牌名 / 通用名雙欄）
+  - SQLite schema：`cocktails`、`cocktail_ingredients`、`diffords_scrape_runs`
+  - 執行進入點：`run_diffords.py`（`--mode incremental / full / test`）
+
+- **LINE Bot `酒譜` 指令**（`bot.py`）
+  - 新指令：`酒譜 <名稱>`、`酒方 <名稱>`、`recipe <名稱>`
+  - 顯示完整酒譜：食材（品牌/通用名）、作法、裝飾、歷史、評語、評分
+  - 精確比對失敗時回退至模糊搜尋，多筆結果顯示列表
+  - `雞尾酒` 指令推薦結果後自動附加 Difford's history/review 作為補充參考
+
+- **Cloud Run Job（diffords）**（`.github/workflows/deploy.yml`、`Dockerfile.diffords`）
+  - 獨立輕量容器，與 scraper 容器分開部署
+  - GCS 下載 / 上傳 `diffords.db`，LINE 推播通知
+
+### 變更
+- `distiller_scraper/__init__.py`：版本升至 2.4.0，新增 `DiffordsGuideScraper`、`DiffordsStorage`、`DiffordsExtractor` 延遲導入
+- `distiller_scraper/notify.py`：`notify_success/failure/skipped` 新增 `source` 參數（預設 `"Distiller"`，向下相容）
+
+### 重構
+- `bot.py`：合併 `_ensure_db_from_gcs` 與 `_ensure_diffords_db_from_gcs` 為單一函式（新增 `blob_name` 參數）
+- `bot.py`：新增 `_truncate(text, max_len)` helper，統一 4 處截斷邏輯，並統一 review 截斷上限為 150 字元
+- `bot.py`：`fmt_recipe` 單筆搜尋結果改用 `_attach_ingredients`，避免重複 SELECT
+- `diffords_storage.py`：`get_cocktail_by_name` 新增 fuzzy fallback（LIKE 查詢），加入 context manager
+
+### 測試
+- 新增 35 個 Difford's 單元測試（`test_diffords.py`）
+- 新增 13 個 recipe 指令測試（`test_bot.py`）
+- 總測試數：450 passed
+
 ## [2.7.0] - 2026-04-12
 
 ### 新增
