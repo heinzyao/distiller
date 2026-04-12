@@ -837,3 +837,46 @@ class TestDiffordsEnrichment:
         result = fmt_cocktail(db_path, "Negroni", None, diffords_db_path=missing)
         assert isinstance(result, str)
         assert "1919" not in result
+
+
+class TestFmtHelpCocktailSection:
+    """Test fmt_help() contains 🍸 調酒查詢 section with cocktail commands."""
+
+    def test_fmt_help_contains_cocktail_section_header(self):
+        """fmt_help() should include '🍸 調酒查詢' header."""
+        result = fmt_help()
+        assert "🍸 調酒查詢" in result
+
+    def test_fmt_help_contains_specific_cocktail_commands(self):
+        """fmt_help() should list all 6 cocktail commands."""
+        result = fmt_help()
+        expected_commands = [
+            "調酒排行",
+            "調酒搜尋",
+            "調酒詳情",
+            "調酒統計",
+            "調酒列表",
+            "我能做什麼",
+        ]
+        for cmd in expected_commands:
+            assert cmd in result
+
+
+class TestFmtCocktailEmptyDb:
+    """Test fmt_cocktail_* functions return _DIFFORDS_DB_MISSING when DB missing."""
+
+    def test_fmt_cocktail_top_returns_missing_db_message(self, tmp_path):
+        """fmt_cocktail_top() returns _DIFFORDS_DB_MISSING when DB doesn't exist."""
+        from bot import fmt_cocktail_top, _DIFFORDS_DB_MISSING
+
+        missing_db_path = str(tmp_path / "nonexistent_diffords.db")
+        result = fmt_cocktail_top(missing_db_path, n=10)
+        assert result == _DIFFORDS_DB_MISSING
+
+    def test_fmt_cocktail_search_returns_missing_db_message(self, tmp_path):
+        """fmt_cocktail_search() returns _DIFFORDS_DB_MISSING when DB doesn't exist."""
+        from bot import fmt_cocktail_search, _DIFFORDS_DB_MISSING
+
+        missing_db_path = str(tmp_path / "nonexistent_diffords.db")
+        result = fmt_cocktail_search(missing_db_path, "martini")
+        assert result == _DIFFORDS_DB_MISSING
