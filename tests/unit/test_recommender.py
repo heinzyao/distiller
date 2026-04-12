@@ -261,7 +261,7 @@ class TestFormatRecommendation:
     def test_recipe_shown_in_output(self):
         result = self._make_result()
         text = format_recommendation(result)
-        assert "📋 酒譜" in text
+        assert "📋 經典酒譜" in text
         assert "琴酒" in text
         assert "30ml" in text
 

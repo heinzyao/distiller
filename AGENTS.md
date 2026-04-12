@@ -19,6 +19,25 @@
 
 ## 🤖 代理協作歷史
 
+### 2026-04-12 | OpenCode Sisyphus (Session 2)
+
+**工作內容**：
+1. **v2.10.0 UI 美化測試修復與部署**
+   - 修復 6 個因 v2.10.0 LINE 訊息格式美化導致的測試失敗
+     - `test_notify.py`：模式名稱由小寫 (`full`/`medium`) 改為大寫 (`FULL`/`MEDIUM`)（3 處）
+     - `test_recommender.py`：`📋 酒譜` → `📋 經典酒譜`（1 處）
+     - `test_bot.py`：`總筆數` → `總藏酒量`（2 處）
+   - 更新 AGENTS.md、cocktail-recommender-plan.md
+   - 推送至 origin/main 觸發 GitHub Actions CI/CD 自動部署
+
+**主要變更**：
+- 修改 `tests/unit/test_notify.py`（修正 3 個斷言）
+- 修改 `tests/unit/test_recommender.py`（修正 1 個斷言）
+- 修改 `tests/unit/test_bot.py`（修正 2 個斷言）
+- 更新 `AGENTS.md`（新增本次工作紀錄）
+- 更新 `tasks/cocktail-recommender-plan.md`（更新日期）
+- **總計：446 個測試全數通過**
+
 ### 2026-04-12 | OpenCode Sisyphus
 
 **工作內容**：
@@ -581,4 +600,4 @@ python run.py --mode full
 
 ---
 
-*最後更新：2026-03-11 by Claude Code*
+*最後更新：2026-04-12 by OpenCode Sisyphus*

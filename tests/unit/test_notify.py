@@ -214,7 +214,7 @@ class TestNotifySuccess:
         assert "3" in msg
         assert "whiskey" in msg
         assert "gin" in msg
-        assert "full" in msg
+        assert "FULL" in msg
 
     def test_handles_english_stat_keys(self, notifier):
         stats = {
@@ -273,7 +273,7 @@ class TestNotifyFailure:
         assert result is True
         msg = mock_send.call_args[0][0]
         assert "Driver crashed" in msg
-        assert "full" in msg
+        assert "FULL" in msg
 
     def test_default_error_message(self, notifier):
         with patch.object(notifier, "send", return_value=True) as mock_send:
@@ -354,7 +354,7 @@ class TestNotifySkipped:
         with patch.object(notifier, "send", return_value=True) as mock_send:
             notifier.notify_skipped("medium")
         msg = mock_send.call_args[0][0]
-        assert "medium" in msg
+        assert "MEDIUM" in msg
 
     def test_skipped_shows_last_run_at(self, notifier):
         with patch.object(notifier, "send", return_value=True) as mock_send:

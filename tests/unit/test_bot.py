@@ -310,7 +310,7 @@ class TestFmtInfo:
 class TestFmtStats:
     def test_output(self, db_path):
         result = fmt_stats(db_path)
-        assert "總筆數" in result and "4" in result
+        assert "總藏酒量" in result and "4" in result
         assert "類型" in result
         assert "產地" in result
 
@@ -368,7 +368,7 @@ class TestHandle:
 
     def test_stats(self, db_path):
         result = _handle("統計", db_path)
-        assert "總筆數" in result
+        assert "總藏酒量" in result
 
     def test_search(self, db_path):
         result = _handle("搜尋 Hibiki", db_path)
@@ -701,31 +701,33 @@ def diffords_db(tmp_path):
 
     db = tmp_path / "diffords.db"
     with DiffordsStorage(str(db)) as storage:
-        storage.save_cocktail({
-            "url": "https://www.diffordsguide.com/cocktails/recipe/1502/negroni",
-            "name": "Negroni",
-            "description": "A classic Italian aperitif cocktail.",
-            "glassware": "Old-fashioned glass",
-            "garnish": "Orange slice",
-            "prepare": None,
-            "instructions": "Stir all ingredients with ice. Strain into glass.",
-            "review": "A perfectly balanced bitter classic.",
-            "history": "Invented by Count Camillo Negroni in 1919.",
-            "tags": ["bitter", "classic"],
-            "rating_value": 4.5,
-            "rating_count": 200,
-            "calories": 200,
-            "prep_time_minutes": 2,
-            "abv": 28.0,
-            "date_published": "2010-01-01",
-            "lastmod": "2024-01-01",
-            "ingredients_html": [
-                {"sort_order": 1, "item": "Campari", "amount": "30ml"},
-                {"sort_order": 2, "item": "Sweet vermouth", "amount": "30ml"},
-                {"sort_order": 3, "item": "Gin", "amount": "30ml"},
-            ],
-            "ingredients_generic": [],
-        })
+        storage.save_cocktail(
+            {
+                "url": "https://www.diffordsguide.com/cocktails/recipe/1502/negroni",
+                "name": "Negroni",
+                "description": "A classic Italian aperitif cocktail.",
+                "glassware": "Old-fashioned glass",
+                "garnish": "Orange slice",
+                "prepare": None,
+                "instructions": "Stir all ingredients with ice. Strain into glass.",
+                "review": "A perfectly balanced bitter classic.",
+                "history": "Invented by Count Camillo Negroni in 1919.",
+                "tags": ["bitter", "classic"],
+                "rating_value": 4.5,
+                "rating_count": 200,
+                "calories": 200,
+                "prep_time_minutes": 2,
+                "abv": 28.0,
+                "date_published": "2010-01-01",
+                "lastmod": "2024-01-01",
+                "ingredients_html": [
+                    {"sort_order": 1, "item": "Campari", "amount": "30ml"},
+                    {"sort_order": 2, "item": "Sweet vermouth", "amount": "30ml"},
+                    {"sort_order": 3, "item": "Gin", "amount": "30ml"},
+                ],
+                "ingredients_generic": [],
+            }
+        )
     return str(db)
 
 
@@ -797,6 +799,7 @@ class TestHandleRecipe:
     def test_recipe_empty_query(self, db_path, diffords_db):
         # parse_command 不會產生空 query（需要至少一個字），直接測 fmt_recipe
         from bot import fmt_recipe
+
         # 空名稱測試：search 會找不到
         result = fmt_recipe(diffords_db, "zzz_nothing")
         assert "❓" in result
@@ -817,16 +820,17 @@ def mock_recommender_none():
 class TestDiffordsEnrichment:
     """測試 cocktail 指令後附加 Difford's history/review。"""
 
-    def test_enrichment_appended_when_db_exists(self, db_path, diffords_db,
-                                                mock_recommender_none):
+    def test_enrichment_appended_when_db_exists(
+        self, db_path, diffords_db, mock_recommender_none
+    ):
         from bot import fmt_cocktail
 
-        result = fmt_cocktail(db_path, "Negroni", None,
-                              diffords_db_path=diffords_db)
+        result = fmt_cocktail(db_path, "Negroni", None, diffords_db_path=diffords_db)
         assert isinstance(result, str)
 
-    def test_enrichment_skipped_when_no_db(self, db_path, tmp_path,
-                                           mock_recommender_none):
+    def test_enrichment_skipped_when_no_db(
+        self, db_path, tmp_path, mock_recommender_none
+    ):
         from bot import fmt_cocktail
 
         missing = str(tmp_path / "no.db")
