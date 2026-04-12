@@ -381,76 +381,14 @@ class DiffordsStorage:
     def get_top_rated(self, limit: int = 20) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             """
-            SELECT * FROM cocktails
-            WHERE rating_value IS NOT NULL AND rating_count >= 5
-            ORDER BY rating_value DESC, rating_count DESC
-            LIMIT ?
-        """,
+             SELECT * FROM cocktails
+             WHERE rating_value IS NOT NULL AND rating_count >= 5
+             ORDER BY rating_value DESC, rating_count DESC
+             LIMIT ?
+         """,
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
-
-    def get_makeable_cocktails(
-        self,
-        user_spirit_types: list[str],
-        mapping: dict[str, Any],
-        limit: int = 20,
-    ) -> list[dict[str, Any]]:
-        """Return cocktails that are fully makeable by user spirits."""
-        try:
-            mapping = mapping or {}
-            if not mapping:
-                return []
-
-            normalized_mapping: dict[str, Any] = {
-                str(k).lower(): v for k, v in mapping.items()
-            }
-            user_types = {str(t).lower() for t in (user_spirit_types or []) if t}
-
-            results: list[dict[str, Any]] = []
-            cocktails = self.get_top_rated(limit=9999)
-            for cocktail in cocktails:
-                cocktail = self._attach_ingredients(cocktail)
-                matched: list[str] = []
-                missing: list[str] = []
-                makeable = True
-
-                for ing in cocktail.get("ingredients", []):
-                    item_generic = (ing.get("item_generic") or "").strip()
-                    if not item_generic:
-                        continue
-                    key = item_generic.lower()
-                    if key not in normalized_mapping:
-                        continue
-                    mapped = normalized_mapping[key]
-
-                    if isinstance(mapped, str):
-                        if mapped == _NON_SPIRIT_SENTINEL:
-                            continue
-                        continue
-
-                    if isinstance(mapped, list):
-                        if any(str(t).lower() in user_types for t in mapped):
-                            matched.append(key)
-                            continue
-                        missing.append(key)
-                        makeable = False
-                        continue
-
-                if makeable:
-                    cocktail["match_score"] = 100
-                    cocktail["matched_ingredients"] = matched
-                    cocktail["missing_ingredients"] = []
-                    results.append(cocktail)
-
-            results.sort(
-                key=lambda c: c.get("rating_value") or 0,
-                reverse=True,
-            )
-            return results[:limit]
-        except Exception as exc:
-            logger.error("DiffordsStorage.get_makeable_cocktails 失敗: %s", exc)
-            return []
 
     def get_stats(self) -> dict[str, Any]:
         total = self.conn.execute("SELECT COUNT(*) FROM cocktails").fetchone()[0]

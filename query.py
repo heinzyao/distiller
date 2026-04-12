@@ -19,7 +19,6 @@ Distiller 資料庫查詢工具
 """
 
 import argparse
-import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -257,7 +256,7 @@ def cmd_info(args):
         (row["id"],),
     ).fetchall()
     if flavors:
-        print(f"\n  🎨 風味圖譜：")
+        print("\n  🎨 風味圖譜：")
         for f in flavors:
             bar = "█" * (f["flavor_value"] // 5) + "░" * (20 - f["flavor_value"] // 5)
             print(f"    {f['flavor_name']:15s} {bar} {f['flavor_value']}")
@@ -293,7 +292,7 @@ def cmd_stats(args):
     print(f"  分數區間：{min_score} ~ {max_score}")
 
     # 類型分布
-    print(f"\n  📋 類型分布：")
+    print("\n  📋 類型分布：")
     types = conn.execute(
         "SELECT spirit_type, COUNT(*) c, ROUND(AVG(expert_score),1) avg FROM spirits GROUP BY spirit_type ORDER BY c DESC"
     ).fetchall()
@@ -304,7 +303,7 @@ def cmd_stats(args):
     )
 
     # 產地分布 Top 10
-    print(f"\n  🌍 產地分布（Top 10）：")
+    print("\n  🌍 產地分布（Top 10）：")
     countries = conn.execute(
         "SELECT country, COUNT(*) c, ROUND(AVG(expert_score),1) avg FROM spirits WHERE country IS NOT NULL GROUP BY country ORDER BY c DESC LIMIT 10"
     ).fetchall()
@@ -315,7 +314,7 @@ def cmd_stats(args):
     )
 
     # 評分分布
-    print(f"\n  📈 評分分布：")
+    print("\n  📈 評分分布：")
     brackets = [
         ("90-100（傑出）", 90, 101),
         ("80-89 （優良）", 80, 90),
@@ -335,7 +334,7 @@ def cmd_stats(args):
         "SELECT started_at, total_scraped, total_failed, status FROM scrape_runs ORDER BY id DESC LIMIT 3"
     ).fetchall()
     if runs:
-        print(f"\n  🕐 最近爬取記錄：")
+        print("\n  🕐 最近爬取記錄：")
         _print_table(
             ["時間", "成功", "失敗", "狀態"],
             [(r[0], r[1], r[2], r[3]) for r in runs],
@@ -387,7 +386,7 @@ def cmd_flavors(args):
             ORDER BY avg DESC
         """
         rows = conn.execute(sql).fetchall()
-        print(f"\n🎨 風味維度統計\n")
+        print("\n🎨 風味維度統計\n")
         data = []
         for r in rows:
             bar = "█" * round(r["avg"] / 5)
@@ -504,7 +503,7 @@ def cmd_cocktail_info(args):
             print(f"\n  ⭐ 評語：\n  {result['review'][:200]}")
         ingredients = result.get("ingredients", [])
         if ingredients:
-            print(f"\n  🥃 食材：")
+            print("\n  🥃 食材：")
             for ing in ingredients:
                 amount = ing.get("amount") or ""
                 item = ing.get("item") or ""

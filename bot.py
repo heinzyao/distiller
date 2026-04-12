@@ -651,9 +651,16 @@ def _fmt_recipe_detail(c: dict) -> str:
     return "\n".join(lines)
 
 
+_DIFFORDS_DB_MISSING = (
+    "⚠️ Difford's Guide 資料庫尚未建立。\n"
+    "請先執行 Difford's 爬蟲：\n"
+    "uv run python run_diffords.py --mode test"
+)
+
+
 def fmt_cocktail_top(diffords_db_path: str, n: int = 10) -> str:
     if not Path(diffords_db_path).exists():
-        return "⚠️ Difford's Guide 資料庫尚未建立。\n請先執行 Difford's 爬蟲：\nuv run python run_diffords.py --mode test"
+        return _DIFFORDS_DB_MISSING
     from distiller_scraper.diffords_storage import DiffordsStorage
 
     with DiffordsStorage(diffords_db_path) as storage:
@@ -678,7 +685,7 @@ def fmt_cocktail_top(diffords_db_path: str, n: int = 10) -> str:
 
 def fmt_cocktail_search(diffords_db_path: str, keyword: str) -> str:
     if not Path(diffords_db_path).exists():
-        return "⚠️ Difford's Guide 資料庫尚未建立。\n請先執行 Difford's 爬蟲：\nuv run python run_diffords.py --mode test"
+        return _DIFFORDS_DB_MISSING
     from distiller_scraper.diffords_storage import DiffordsStorage
 
     with DiffordsStorage(diffords_db_path) as storage:
@@ -719,13 +726,6 @@ def _get_diffords_reference(diffords_db_path: str | None, cocktail_name: str) ->
     except Exception as e:
         logger.debug("Difford's 參考資料查詢失敗：%s", e)
         return ""
-
-
-_DIFFORDS_DB_MISSING = (
-    "⚠️ Difford's Guide 資料庫尚未建立。\n"
-    "請先執行 Difford's 爬蟲：\n"
-    "uv run python run_diffords.py --mode test"
-)
 
 
 def fmt_cocktail_info(diffords_db_path: str, name: str) -> str:
