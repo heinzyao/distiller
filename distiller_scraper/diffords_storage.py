@@ -316,7 +316,6 @@ class DiffordsStorage:
             "SELECT * FROM cocktails WHERE LOWER(name) = LOWER(?) LIMIT 1", (name,)
         ).fetchone()
         if not row:
-            # fuzzy fallback：名稱包含 query，或 query 包含名稱
             row = self.conn.execute(
                 "SELECT * FROM cocktails WHERE LOWER(name) LIKE LOWER(?) LIMIT 1",
                 (f"%{name}%",),

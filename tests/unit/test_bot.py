@@ -802,39 +802,34 @@ class TestHandleRecipe:
         assert "❓" in result
 
 
+@pytest.fixture
+def mock_recommender_none():
+    """CocktailRecommender mock，recommend 回傳 None（模擬無推薦結果）。"""
+    with patch("distiller_scraper.recommender.CocktailRecommender") as MockRec:
+        inst = MagicMock()
+        inst.__enter__ = lambda s: inst
+        inst.__exit__ = MagicMock(return_value=False)
+        inst.recommend.return_value = None
+        MockRec.return_value = inst
+        yield MockRec
+
+
 class TestDiffordsEnrichment:
     """測試 cocktail 指令後附加 Difford's history/review。"""
 
-    def test_enrichment_appended_when_db_exists(self, db_path, diffords_db):
+    def test_enrichment_appended_when_db_exists(self, db_path, diffords_db,
+                                                mock_recommender_none):
         from bot import fmt_cocktail
 
-        with patch("distiller_scraper.recommender.CocktailRecommender") as MockRec:
-            mock_instance = MagicMock()
-            mock_instance.__enter__ = lambda s: mock_instance
-            mock_instance.__exit__ = MagicMock(return_value=False)
-            mock_instance.recommend.return_value = None
-            MockRec.return_value = mock_instance
+        result = fmt_cocktail(db_path, "Negroni", None,
+                              diffords_db_path=diffords_db)
+        assert isinstance(result, str)
 
-            # recommend 回 None，fmt_cocktail 會回 ⚠️；
-            # 但 Difford's 仍嘗試查詢（不影響主流程）
-            result = fmt_cocktail(db_path, "Negroni", None,
-                                  diffords_db_path=diffords_db)
-            # 不論推薦是否成功，不應拋例外
-            assert isinstance(result, str)
-
-    def test_enrichment_skipped_when_no_db(self, db_path, tmp_path):
+    def test_enrichment_skipped_when_no_db(self, db_path, tmp_path,
+                                           mock_recommender_none):
         from bot import fmt_cocktail
 
-        with patch("distiller_scraper.recommender.CocktailRecommender") as MockRec:
-            mock_instance = MagicMock()
-            mock_instance.__enter__ = lambda s: mock_instance
-            mock_instance.__exit__ = MagicMock(return_value=False)
-            mock_instance.recommend.return_value = None
-            MockRec.return_value = mock_instance
-
-            missing = str(tmp_path / "no.db")
-            result = fmt_cocktail(db_path, "Negroni", None,
-                                  diffords_db_path=missing)
-            assert isinstance(result, str)
-            # 確認沒有歷史 section（DB 不存在）
-            assert "1919" not in result
+        missing = str(tmp_path / "no.db")
+        result = fmt_cocktail(db_path, "Negroni", None, diffords_db_path=missing)
+        assert isinstance(result, str)
+        assert "1919" not in result

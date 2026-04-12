@@ -68,6 +68,10 @@ _SEP = "━" * 16  # 主要分隔線（粗）
 _SEP_LIGHT = "─" * 16  # 次要分隔線（細）
 _MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}  # Top 3 排行獎牌
 
+
+def _truncate(text: str, max_len: int) -> str:
+    return text[:max_len] + "…" if len(text) > max_len else text
+
 # Access Token 快取：避免每次 Webhook 請求都重新取得 Token
 # 結構：{"token": str, "expires_at": float（UNIX timestamp）}
 # 設計理由：LINE Channel Access Token 有效期 30 天，但短期 token 有效期約 30 天
@@ -222,7 +226,7 @@ def _start_scraper(mode: str, db_path: str) -> None:
         _start_scraper_thread(mode, db_path)
 
 
-def _ensure_db_from_gcs(db_path: str) -> bool:
+def _ensure_db_from_gcs(db_path: str, blob_name: str = GCS_DB_BLOB) -> bool:
     """如果資料庫不存在且設定了 GCS_BUCKET，嘗試從 GCS 下載。"""
     if Path(db_path).exists():
         return True
@@ -231,19 +235,7 @@ def _ensure_db_from_gcs(db_path: str) -> bool:
     from distiller_scraper import gcs_storage
 
     logger.info("資料庫不存在，嘗試從 GCS 下載：%s", db_path)
-    return gcs_storage.download_db(GCS_BUCKET, GCS_DB_BLOB, db_path)
-
-
-def _ensure_diffords_db_from_gcs(db_path: str) -> bool:
-    """如果 Difford's DB 不存在且設定了 GCS_BUCKET，嘗試從 GCS 下載。"""
-    if Path(db_path).exists():
-        return True
-    if not GCS_BUCKET:
-        return False
-    from distiller_scraper import gcs_storage
-
-    logger.info("Difford's DB 不存在，嘗試從 GCS 下載：%s", db_path)
-    return gcs_storage.download_db(GCS_BUCKET, GCS_DIFFORDS_DB_BLOB, db_path)
+    return gcs_storage.download_db(GCS_BUCKET, blob_name, db_path)
 
 
 # ---------------------------------------------------------------------------
@@ -557,7 +549,7 @@ def fmt_recipe(diffords_db_path: str, query: str) -> str:
             if not results:
                 return f"❓ 找不到「{query}」的酒譜。\n試試「酒譜 Negroni」或「酒譜 Daiquiri」。"
             if len(results) == 1:
-                cocktail = storage.get_cocktail_by_name(results[0]["name"])
+                cocktail = storage._attach_ingredients(results[0])
             else:
                 lines = [f"🔎 找到 {len(results)} 筆相關酒譜：", _SEP_LIGHT]
                 for r in results:
@@ -619,18 +611,12 @@ def _fmt_recipe_detail(c: dict) -> str:
 
     # 歷史與評論（節錄）
     if c.get("history"):
-        history = c["history"]
-        if len(history) > 200:
-            history = history[:200] + "…"
-        lines.append(f"📖 歷史")
-        lines.append(history)
+        lines.append("📖 歷史")
+        lines.append(_truncate(c["history"], 200))
         lines.append("")
     if c.get("review"):
-        review = c["review"]
-        if len(review) > 150:
-            review = review[:150] + "…"
-        lines.append(f"💬 評語")
-        lines.append(review)
+        lines.append("💬 評語")
+        lines.append(_truncate(c["review"], 150))
         lines.append("")
 
     if c.get("url"):
@@ -652,15 +638,9 @@ def _get_diffords_reference(diffords_db_path: str | None, cocktail_name: str) ->
             return ""
         parts = []
         if c.get("history"):
-            history = c["history"]
-            if len(history) > 200:
-                history = history[:200] + "…"
-            parts.append(f"📖 歷史\n{history}")
+            parts.append(f"📖 歷史\n{_truncate(c['history'], 200)}")
         if c.get("review"):
-            review = c["review"]
-            if len(review) > 120:
-                review = review[:120] + "…"
-            parts.append(f"💬 Difford's 評語\n{review}")
+            parts.append(f"💬 Difford's 評語\n{_truncate(c['review'], 150)}")
         if not parts:
             return ""
         return "\n\n" + _SEP_LIGHT + "\n" + "\n\n".join(parts)
@@ -1019,7 +999,7 @@ def _handle(text: str, db_path: str,
         elif command == "cocktail":
             cocktail_name = str(args[0]) if args[0] else ""
             pref_text = str(args[1]) if len(args) > 1 and args[1] else None
-            _ensure_diffords_db_from_gcs(diffords_db_path)
+            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
             return fmt_cocktail(db_path, cocktail_name, pref_text,
                                 diffords_db_path=diffords_db_path)
         elif command == "cocktail_list":
@@ -1028,8 +1008,7 @@ def _handle(text: str, db_path: str,
             query = str(args[0]) if args else ""
             if not query:
                 return "請輸入酒譜名稱，例：酒譜 Negroni"
-            _ensure_diffords_db_from_gcs(diffords_db_path)
-            if not Path(diffords_db_path).exists():
+            if not _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB):
                 return "⚠️ Difford's 酒譜資料庫尚未建立，請先執行爬蟲。"
             return fmt_recipe(diffords_db_path, query)
         elif command == "run_status":
