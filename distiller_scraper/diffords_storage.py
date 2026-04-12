@@ -18,11 +18,48 @@ diffords_scrape_runs   — 爬取執行記錄（鏡像 spirits 端的 scrape_run
 import json
 import logging
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
+
+_NON_SPIRIT_SENTINEL = "_non_spirit"
+
+
+def load_ingredient_mapping() -> dict[str, Any]:
+    """Load ingredient mapping from project root.
+
+    Returns empty dict on failure.
+    """
+    try:
+        mapping_path = Path(__file__).parent.parent / "ingredient_mapping.json"
+        with mapping_path.open(encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        logger.error("Failed to load ingredient mapping: %s", exc)
+        return {}
+
+
+def get_user_spirit_types(distiller_db_path: str) -> list[str]:
+    """Fetch distinct spirit_type values from distiller DB.
+
+    Returns empty list on failure.
+    """
+    if not distiller_db_path:
+        return []
+    try:
+        with closing(sqlite3.connect(distiller_db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT DISTINCT spirit_type FROM spirits WHERE spirit_type IS NOT NULL"
+            ).fetchall()
+        return [row[0] for row in rows if row[0]]
+    except Exception as exc:
+        logger.error("Failed to load user spirit types: %s", exc)
+        return []
+
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS cocktails (
@@ -71,7 +108,9 @@ CREATE TABLE IF NOT EXISTS diffords_scrape_runs (
 CREATE INDEX IF NOT EXISTS idx_cocktails_name    ON cocktails(name);
 CREATE INDEX IF NOT EXISTS idx_cocktails_rating  ON cocktails(rating_value);
 CREATE INDEX IF NOT EXISTS idx_ci_cocktail       ON cocktail_ingredients(cocktail_id);
+CREATE INDEX IF NOT EXISTS idx_ci_item_generic   ON cocktail_ingredients(item_generic);
 """
+
 
 # 欄位轉型輔助
 def _to_real(value) -> Optional[float]:
@@ -134,7 +173,7 @@ class DiffordsStorage:
     # 儲存
     # ------------------------------------------------------------------
 
-    def save_cocktail(self, data: dict) -> bool:
+    def save_cocktail(self, data: dict[str, Any]) -> bool:
         """儲存單筆雞尾酒（upsert），回傳是否成功。"""
         try:
             with self.conn:
@@ -146,7 +185,7 @@ class DiffordsStorage:
             logger.error("DiffordsStorage.save_cocktail 失敗: %s", e)
             return False
 
-    def _upsert_cocktail(self, cur: sqlite3.Cursor, data: dict) -> int:
+    def _upsert_cocktail(self, cur: sqlite3.Cursor, data: dict[str, Any]) -> int:
         row = self._prepare_row(data)
         existing = cur.execute(
             "SELECT id FROM cocktails WHERE url = ?", (row["url"],)
@@ -154,7 +193,8 @@ class DiffordsStorage:
 
         if existing:
             cocktail_id = existing[0]
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE cocktails SET
                     name=:name, slug=:slug, description=:description,
                     glassware=:glassware, garnish=:garnish, prepare=:prepare,
@@ -164,9 +204,12 @@ class DiffordsStorage:
                     date_published=:date_published, lastmod=:lastmod,
                     scraped_at=CURRENT_TIMESTAMP
                 WHERE url=:url
-            """, row)
+            """,
+                row,
+            )
         else:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO cocktails
                     (id, name, slug, description, glassware, garnish, prepare,
                      instructions, review, history, tags, rating_value, rating_count,
@@ -175,11 +218,17 @@ class DiffordsStorage:
                     (:id, :name, :slug, :description, :glassware, :garnish, :prepare,
                      :instructions, :review, :history, :tags, :rating_value, :rating_count,
                      :calories, :prep_time_min, :abv, :date_published, :url, :lastmod)
-            """, row)
+            """,
+                row,
+            )
             cocktail_id = cur.lastrowid
+            if cocktail_id is None:
+                raise ValueError("Failed to insert cocktail row")
         return cocktail_id
 
-    def _save_ingredients(self, cur: sqlite3.Cursor, cocktail_id: int, data: dict):
+    def _save_ingredients(
+        self, cur: sqlite3.Cursor, cocktail_id: int, data: dict[str, Any]
+    ):
         """先刪後插，確保與最新爬取結果一致。"""
         cur.execute(
             "DELETE FROM cocktail_ingredients WHERE cocktail_id = ?", (cocktail_id,)
@@ -208,7 +257,7 @@ class DiffordsStorage:
             ],
         )
 
-    def _prepare_row(self, data: dict) -> dict:
+    def _prepare_row(self, data: dict[str, Any]) -> dict[str, Any]:
         url = data.get("url", "")
         parts = url.rstrip("/").split("/")
         # URL 格式：/cocktails/recipe/{id}/{slug}
@@ -217,25 +266,25 @@ class DiffordsStorage:
         slug = parts[-1] if parts else None
         tags = data.get("tags")
         return {
-            "id":            cocktail_id,
-            "name":          _to_text(data.get("name")) or "",
-            "slug":          _to_text(slug),
-            "description":   _to_text(data.get("description")),
-            "glassware":     _to_text(data.get("glassware")),
-            "garnish":       _to_text(data.get("garnish")),
-            "prepare":       _to_text(data.get("prepare")),
-            "instructions":  _to_text(data.get("instructions")),
-            "review":        _to_text(data.get("review")),
-            "history":       _to_text(data.get("history")),
-            "tags":          json.dumps(tags, ensure_ascii=False) if tags else None,
-            "rating_value":  _to_real(data.get("rating_value")),
-            "rating_count":  _to_int(data.get("rating_count")),
-            "calories":      _to_int(data.get("calories")),
+            "id": cocktail_id,
+            "name": _to_text(data.get("name")) or "",
+            "slug": _to_text(slug),
+            "description": _to_text(data.get("description")),
+            "glassware": _to_text(data.get("glassware")),
+            "garnish": _to_text(data.get("garnish")),
+            "prepare": _to_text(data.get("prepare")),
+            "instructions": _to_text(data.get("instructions")),
+            "review": _to_text(data.get("review")),
+            "history": _to_text(data.get("history")),
+            "tags": json.dumps(tags, ensure_ascii=False) if tags else None,
+            "rating_value": _to_real(data.get("rating_value")),
+            "rating_count": _to_int(data.get("rating_count")),
+            "calories": _to_int(data.get("calories")),
             "prep_time_min": _to_int(data.get("prep_time_minutes")),
-            "abv":           _to_real(data.get("abv")),
+            "abv": _to_real(data.get("abv")),
             "date_published": _to_text(data.get("date_published")),
-            "url":           url,
-            "lastmod":       _to_text(data.get("lastmod")),
+            "url": url,
+            "lastmod": _to_text(data.get("lastmod")),
         }
 
     # ------------------------------------------------------------------
@@ -248,6 +297,8 @@ class DiffordsStorage:
             (datetime.now().isoformat(), mode),
         )
         self.conn.commit()
+        if cur.lastrowid is None:
+            raise ValueError("Failed to insert scrape run")
         return cur.lastrowid
 
     def finish_scrape_run(
@@ -289,8 +340,9 @@ class DiffordsStorage:
     # 查詢（供 bot.py 使用）
     # ------------------------------------------------------------------
 
-    def search_cocktails(self, query: str, limit: int = 10) -> list[dict]:
-        rows = self.conn.execute("""
+    def search_cocktails(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            """
             SELECT c.*,
                    GROUP_CONCAT(ci.amount || ' ' || ci.item, ', ') AS ingredients_text
             FROM cocktails c
@@ -299,10 +351,12 @@ class DiffordsStorage:
             GROUP BY c.id
             ORDER BY c.rating_value DESC NULLS LAST
             LIMIT ?
-        """, (f"%{query}%", limit)).fetchall()
+        """,
+            (f"%{query}%", limit),
+        ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_cocktail_by_id(self, cocktail_id: int) -> Optional[dict]:
+    def get_cocktail_by_id(self, cocktail_id: int) -> Optional[dict[str, Any]]:
         row = self.conn.execute(
             "SELECT * FROM cocktails WHERE id = ?", (cocktail_id,)
         ).fetchone()
@@ -310,7 +364,7 @@ class DiffordsStorage:
             return None
         return self._attach_ingredients(dict(row))
 
-    def get_cocktail_by_name(self, name: str) -> Optional[dict]:
+    def get_cocktail_by_name(self, name: str) -> Optional[dict[str, Any]]:
         """精確比對（大小寫不分），若無結果則回退至部分比對。"""
         row = self.conn.execute(
             "SELECT * FROM cocktails WHERE LOWER(name) = LOWER(?) LIMIT 1", (name,)
@@ -324,16 +378,81 @@ class DiffordsStorage:
             return None
         return self._attach_ingredients(dict(row))
 
-    def get_top_rated(self, limit: int = 20) -> list[dict]:
-        rows = self.conn.execute("""
+    def get_top_rated(self, limit: int = 20) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            """
             SELECT * FROM cocktails
             WHERE rating_value IS NOT NULL AND rating_count >= 5
             ORDER BY rating_value DESC, rating_count DESC
             LIMIT ?
-        """, (limit,)).fetchall()
+        """,
+            (limit,),
+        ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_stats(self) -> dict:
+    def get_makeable_cocktails(
+        self,
+        user_spirit_types: list[str],
+        mapping: dict[str, Any],
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Return cocktails that are fully makeable by user spirits."""
+        try:
+            mapping = mapping or {}
+            if not mapping:
+                return []
+
+            normalized_mapping: dict[str, Any] = {
+                str(k).lower(): v for k, v in mapping.items()
+            }
+            user_types = {str(t).lower() for t in (user_spirit_types or []) if t}
+
+            results: list[dict[str, Any]] = []
+            cocktails = self.get_top_rated(limit=9999)
+            for cocktail in cocktails:
+                cocktail = self._attach_ingredients(cocktail)
+                matched: list[str] = []
+                missing: list[str] = []
+                makeable = True
+
+                for ing in cocktail.get("ingredients", []):
+                    item_generic = (ing.get("item_generic") or "").strip()
+                    if not item_generic:
+                        continue
+                    key = item_generic.lower()
+                    if key not in normalized_mapping:
+                        continue
+                    mapped = normalized_mapping[key]
+
+                    if isinstance(mapped, str):
+                        if mapped == _NON_SPIRIT_SENTINEL:
+                            continue
+                        continue
+
+                    if isinstance(mapped, list):
+                        if any(str(t).lower() in user_types for t in mapped):
+                            matched.append(key)
+                            continue
+                        missing.append(key)
+                        makeable = False
+                        continue
+
+                if makeable:
+                    cocktail["match_score"] = 100
+                    cocktail["matched_ingredients"] = matched
+                    cocktail["missing_ingredients"] = []
+                    results.append(cocktail)
+
+            results.sort(
+                key=lambda c: c.get("rating_value") or 0,
+                reverse=True,
+            )
+            return results[:limit]
+        except Exception as exc:
+            logger.error("DiffordsStorage.get_makeable_cocktails 失敗: %s", exc)
+            return []
+
+    def get_stats(self) -> dict[str, Any]:
         total = self.conn.execute("SELECT COUNT(*) FROM cocktails").fetchone()[0]
         avg_rating = self.conn.execute(
             "SELECT ROUND(AVG(rating_value), 2) FROM cocktails WHERE rating_value IS NOT NULL"
@@ -345,7 +464,153 @@ class DiffordsStorage:
             "最後爬取": last_run or "從未",
         }
 
-    def _attach_ingredients(self, cocktail: dict) -> dict:
+    def filter_by_ingredient(
+        self, ingredient: str, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        """Search cocktail_ingredients.item OR item_generic LIKE %ingredient%."""
+        rows = self.conn.execute(
+            """
+            SELECT DISTINCT c.*
+            FROM cocktails c
+            JOIN cocktail_ingredients ci ON c.id = ci.cocktail_id
+            WHERE LOWER(ci.item) LIKE LOWER(?)
+               OR LOWER(ci.item_generic) LIKE LOWER(?)
+            ORDER BY c.rating_value DESC NULLS LAST
+            LIMIT ?
+            """,
+            (f"%{ingredient}%", f"%{ingredient}%", limit),
+        ).fetchall()
+        return [self._attach_ingredients(dict(r)) for r in rows]
+
+    def filter_by_tag(self, tag: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Filter cocktails where tags JSON contains the given tag string."""
+        rows = self.conn.execute(
+            "SELECT * FROM cocktails WHERE tags IS NOT NULL"
+        ).fetchall()
+        results: list[dict[str, Any]] = []
+        target = tag.strip().lower()
+        for row in rows:
+            cocktail = dict(row)
+            try:
+                tags = json.loads(cocktail.get("tags") or "[]")
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if any(str(t).lower() == target for t in tags):
+                results.append(self._attach_ingredients(cocktail))
+                if len(results) >= limit:
+                    break
+        return results
+
+    def filter_by_rating(
+        self,
+        min_rating: float = 0.0,
+        max_rating: float = 5.0,
+        min_count: int = 5,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Filter by rating range with minimum vote count."""
+        rows = self.conn.execute(
+            """
+            SELECT * FROM cocktails
+            WHERE rating_value IS NOT NULL
+              AND rating_value BETWEEN ? AND ?
+              AND rating_count >= ?
+            ORDER BY rating_value DESC, rating_count DESC
+            LIMIT ?
+            """,
+            (min_rating, max_rating, min_count, limit),
+        ).fetchall()
+        return [self._attach_ingredients(dict(r)) for r in rows]
+
+    def filter_by_abv(
+        self,
+        min_abv: float = 0.0,
+        max_abv: float = 100.0,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Filter by ABV range."""
+        rows = self.conn.execute(
+            """
+            SELECT * FROM cocktails
+            WHERE abv IS NOT NULL
+              AND abv BETWEEN ? AND ?
+            ORDER BY abv DESC NULLS LAST
+            LIMIT ?
+            """,
+            (min_abv, max_abv, limit),
+        ).fetchall()
+        return [self._attach_ingredients(dict(r)) for r in rows]
+
+    def get_makeable_cocktails(
+        self,
+        spirit_types: list[str],
+        ingredient_mapping: dict[str, Any],
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        if not ingredient_mapping:
+            return []
+
+        normalized_spirits = {s.strip().lower() for s in spirit_types if s.strip()}
+        rows = self.conn.execute(
+            """
+            SELECT * FROM cocktails
+            ORDER BY rating_value DESC NULLS LAST
+            """
+        ).fetchall()
+
+        results: list[dict[str, Any]] = []
+        for row in rows:
+            cocktail = self._attach_ingredients(dict(row))
+            ingredients = [
+                (ing.get("item_generic") or ing.get("item") or "").strip().lower()
+                for ing in cocktail.get("ingredients", [])
+            ]
+            required: set[str] = set()
+            matched: set[str] = set()
+            has_mapped = False
+
+            for ingredient in ingredients:
+                if not ingredient:
+                    continue
+                if ingredient not in ingredient_mapping:
+                    continue
+                has_mapped = True
+                mapped = ingredient_mapping[ingredient]
+                if mapped == _NON_SPIRIT_SENTINEL:
+                    continue
+                required.add(ingredient)
+                mapped_spirits = {s.strip().lower() for s in mapped}
+                if normalized_spirits & mapped_spirits:
+                    matched.add(ingredient)
+
+            if not has_mapped:
+                continue
+            if not required:
+                cocktail.update(
+                    {
+                        "match_score": 100,
+                        "matched_ingredients": [],
+                        "missing_ingredients": [],
+                    }
+                )
+            else:
+                if not normalized_spirits or required != matched:
+                    continue
+                cocktail.update(
+                    {
+                        "match_score": 100,
+                        "matched_ingredients": sorted(matched),
+                        "missing_ingredients": [],
+                    }
+                )
+
+            results.append(cocktail)
+            if len(results) >= limit:
+                break
+
+        return results
+
+    def _attach_ingredients(self, cocktail: dict[str, Any]) -> dict[str, Any]:
         ings = self.conn.execute(
             "SELECT * FROM cocktail_ingredients WHERE cocktail_id = ? ORDER BY sort_order",
             (cocktail["id"],),
