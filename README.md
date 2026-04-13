@@ -16,12 +16,10 @@ A Python web scraper project designed to extract liquor reviews and spirit profi
 - Smart pagination scraping with automatic end-condition detection.
 - Automatic API endpoint discovery, significantly boosting scraping speed.
 - Multiple storage backends: CSV / SQLite / Both combined.
-- **Cocktail Recommender**: multi-ingredient spirit recommendations for 29 classic cocktails with flavor-vector scoring and natural language preference parsing.
 - **Difford's Guide Scraper**: lightweight scraper (requests + BeautifulSoup, no Chrome) for cocktail recipes from diffordsguide.com — sitemap-driven incremental updates.
 - **Cocktail Query System**: Search, filter, and cross-query 6000+ cocktail recipes from Difford's Guide database — by ingredient, tag, rating, ABV, or spirit availability.
 - **`recipe` Bot Command**: query full cocktail recipes (ingredients, instructions, history, review) from the Difford's Guide database.
-- **Claude API Integration**: optional AI-generated sommelier-style explanations for top recommendations.
-- 502 automated tests with GitHub Actions CI/CD pipelines.
+- 468 automated tests with GitHub Actions CI/CD pipelines.
 
 ### Project Structure
 
@@ -37,9 +35,7 @@ distiller/
 │   ├── diffords_selectors.py  # HTML / JSON-LD Extractor for Difford's Guide
 │   ├── diffords_storage.py    # SQLite Storage for Difford's cocktail recipes
 │   ├── diffords_config.py      # Difford's Guide Configuration Constants
-│   ├── cocktail_db.py         # 29 Classic Cocktails Knowledge Base
-│   ├── flavor_parser.py       # Natural Language Flavor Preference Parser
-│   └── recommender.py         # CocktailRecommender (flavor-vector scoring)
+│   └── flavor_parser.py       # Natural Language Flavor Preference Parser
 ├── data/                      # Centralized CSV Outputs (Auto-generated)
 ├── bot.py                     # LINE Bot (Flask webhook, port 8000)
 ├── run.py                     # Distiller.com Scraper Entry Point
@@ -126,7 +122,7 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `cocktail`, `recipe` / `酒譜`, `調酒`, `help`
+Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `recipe` / `酒譜`, `調酒`, `help`
 
 #### Difford's Guide Scraper
 
@@ -274,12 +270,10 @@ MIT
 - 智能分頁爬取，自動偵測停止條件
 - API 端點自動探索，大幅提升爬取速度
 - 多儲存後端：CSV / SQLite / 雙輸出
-- **雞尾酒推薦引擎**：29 款經典雞尾酒多成分推薦，風味向量評分，自然語言偏好解析
 - **Difford's Guide 爬蟲**：輕量爬蟲（requests + BeautifulSoup，無需 Chrome），從 diffordsguide.com 爬取雞尾酒酒譜，Sitemap 驅動增量更新
 - **調酒查詢系統**：搜尋、篩選、交叉查詢 Difford's Guide 資料庫 6000+ 雞尾酒酒譜 — 依材料、標籤、評分、ABV 或可用烈酒
 - **`酒譜` Bot 指令**：查詢 Difford's Guide 資料庫的完整酒譜（食材、作法、歷史、評語）
-- **Claude API 整合**：可選的 AI 品酒師口吻個人化說明
-- 502 個自動化測試，GitHub Actions CI/CD
+- 468 個自動化測試，GitHub Actions CI/CD
 
 ### 專案結構
 
@@ -295,9 +289,7 @@ distiller/
 │   ├── diffords_selectors.py  # Difford's HTML / JSON-LD 資料擷取器
 │   ├── diffords_storage.py    # Difford's 雞尾酒酒譜 SQLite 儲存層
 │   ├── diffords_config.py      # Difford's Guide 設定常數
-│   ├── cocktail_db.py         # 29 款經典雞尾酒知識庫
-│   ├── flavor_parser.py       # 自然語言風味偏好解析器
-│   └── recommender.py         # 雞尾酒推薦引擎（風味向量評分）
+│   └── flavor_parser.py       # 自然語言風味偏好解析器
 ├── data/                      # CSV 輸出集中處（自動建立）
 ├── bot.py                     # LINE Bot（Flask webhook，port 8000）
 ├── run.py                     # Distiller.com 爬蟲進入點
@@ -384,7 +376,7 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`雞尾酒`、`酒譜`、`調酒`、`說明`
+支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`酒譜`、`調酒`、`說明`
 
 #### Difford's Guide 爬蟲
 

@@ -805,40 +805,6 @@ class TestHandleRecipe:
         assert "❓" in result
 
 
-@pytest.fixture
-def mock_recommender_none():
-    """CocktailRecommender mock，recommend 回傳 None（模擬無推薦結果）。"""
-    with patch("distiller_scraper.recommender.CocktailRecommender") as MockRec:
-        inst = MagicMock()
-        inst.__enter__ = lambda s: inst
-        inst.__exit__ = MagicMock(return_value=False)
-        inst.recommend.return_value = None
-        MockRec.return_value = inst
-        yield MockRec
-
-
-class TestDiffordsEnrichment:
-    """測試 cocktail 指令後附加 Difford's history/review。"""
-
-    def test_enrichment_appended_when_db_exists(
-        self, db_path, diffords_db, mock_recommender_none
-    ):
-        from bot import fmt_cocktail
-
-        result = fmt_cocktail(db_path, "Negroni", None, diffords_db_path=diffords_db)
-        assert isinstance(result, str)
-
-    def test_enrichment_skipped_when_no_db(
-        self, db_path, tmp_path, mock_recommender_none
-    ):
-        from bot import fmt_cocktail
-
-        missing = str(tmp_path / "no.db")
-        result = fmt_cocktail(db_path, "Negroni", None, diffords_db_path=missing)
-        assert isinstance(result, str)
-        assert "1919" not in result
-
-
 class TestFmtHelpCocktailSection:
     """Test fmt_help() contains 🍸 調酒查詢 section with cocktail commands."""
 

@@ -562,9 +562,6 @@ def fmt_run_status() -> str:
     return "\n".join(["📡 系統執行狀態", _SEP, distiller_line, "", diffords_line])
 
 
-_TWIST_KEYWORDS = {"twist", "variation", "變化", "創意", "非傳統", "特色"}
-
-
 def fmt_recipe(diffords_db_path: str, query: str) -> str:
     """從 Difford's Guide DB 查詢雞尾酒酒譜並格式化輸出。"""
     from distiller_scraper.diffords_storage import DiffordsStorage
@@ -787,116 +784,6 @@ def fmt_cocktail_stats(diffords_db_path: str) -> str:
     return "\n".join(lines)
 
 
-def fmt_cocktail(
-    db_path: str,
-    cocktail_query: str,
-    pref_text: str | None,
-    diffords_db_path: str | None = None,
-) -> str:
-    """雞尾酒多成分推薦，整合 CocktailRecommender。"""
-    from distiller_scraper.cocktail_db import get_cocktail, list_cocktails
-    from distiller_scraper.recommender import CocktailRecommender, format_recommendation
-    from distiller_scraper.flavor_parser import parse_flavor_prefs
-
-    cocktail = get_cocktail(cocktail_query)
-    # 若查無結果且有偏好文字，嘗試將「酒名 + 偏好文字」合起來當酒名
-    # 處理如 "cocktail Old Fashioned" 被拆成 name="Old", pref="Fashioned" 的情況
-    if cocktail is None and pref_text:
-        full_name = f"{cocktail_query} {pref_text}"
-        cocktail = get_cocktail(full_name)
-        if cocktail is not None:
-            cocktail_query = full_name
-            pref_text = None
-
-    if cocktail is None:
-        supported = "、".join(list_cocktails())
-        return (
-            f"❓ 找不到「{cocktail_query}」的配方。\n\n"
-            f"目前支援：\n{supported}\n\n"
-            "傳送「雞尾酒 清單」查看完整列表。"
-        )
-
-    # 偵測 twist/variation 模式
-    allow_twist = bool(
-        pref_text and any(k in pref_text.lower() for k in _TWIST_KEYWORDS)
-    )
-
-    # 解析偏好文字為風味向量、避免風味、酒款參照
-    user_flavor_prefs = None
-    avoid_flavors = None
-    if pref_text:
-        parsed = parse_flavor_prefs(pref_text)
-        user_flavor_prefs = parsed.flavor_vector
-        avoid_flavors = parsed.avoid_flavors or None
-
-        # 酒款參照解析：查 DB 取平均風味向量，合併至 user_flavor_prefs
-        if parsed.spirit_refs:
-            with _connect(db_path) as conn:
-                for ref_name in parsed.spirit_refs:
-                    rows = conn.execute(
-                        "SELECT id FROM spirits WHERE name LIKE ?",
-                        (f"%{ref_name}%",),
-                    ).fetchall()
-                    if rows:
-                        spirit_ids = [r["id"] for r in rows]
-                        placeholders = ",".join("?" * len(spirit_ids))
-                        flavor_rows = conn.execute(
-                            f"SELECT flavor_name, AVG(flavor_value) AS avg_val "
-                            f"FROM flavor_profiles WHERE spirit_id IN ({placeholders}) "
-                            f"GROUP BY flavor_name",
-                            spirit_ids,
-                        ).fetchall()
-                        if flavor_rows:
-                            if user_flavor_prefs is None:
-                                user_flavor_prefs = {}
-                            for fr in flavor_rows:
-                                dim = fr["flavor_name"]
-                                val = float(fr["avg_val"])
-                                user_flavor_prefs[dim] = max(
-                                    user_flavor_prefs.get(dim, 0.0), val
-                                )
-
-    with CocktailRecommender(db_path) as rec:
-        result = rec.recommend(
-            cocktail_query,
-            user_flavor_prefs=user_flavor_prefs,
-            top_k=3,
-            allow_twist=allow_twist,
-            with_explanations=bool(os.environ.get("ANTHROPIC_API_KEY")),
-            avoid_flavors=avoid_flavors,
-        )
-
-    if result is None:
-        return "⚠️ 推薦時發生錯誤，請稍後再試。"
-
-    text = format_recommendation(result)
-
-    if pref_text and not allow_twist:
-        text += f"\n\n💬 根據您的偏好「{pref_text}」調整排序"
-
-    # 附加 Difford's Guide 補充資訊（history / review）
-    ref = _get_diffords_reference(diffords_db_path, cocktail_query)
-    if ref:
-        text += ref
-
-    return text
-
-
-def _fmt_cocktail_recommend_list() -> str:
-    from distiller_scraper.cocktail_db import COCKTAIL_DB
-
-    lines = ["🍹 支援的經典雞尾酒", _SEP, ""]
-    for cocktail in COCKTAIL_DB.values():
-        aliases = "、".join(cocktail.get("aliases", []))
-        alias_str = f"（{aliases}）" if aliases else ""
-        lines.append(f"• {cocktail['name']}{alias_str}")
-        lines.append(f"  {cocktail['flavor_style']} — {cocktail['description'][:30]}…")
-    lines.append("")
-    lines.append("用法：雞尾酒 <酒名> [偏好描述]")
-    lines.append("例：雞尾酒 Negroni 我喜歡苦味草本")
-    return "\n".join(lines)
-
-
 def fmt_cocktail_list(
     diffords_db_path: str,
     filter_type: str | None = None,
@@ -990,41 +877,34 @@ def fmt_cocktail_makeable(diffords_db_path: str, distiller_db_path: str) -> str:
 def fmt_help() -> str:
     return "\n".join(
         [
-            "🥃 Distiller 查詢指令指南",
+            "🥃 【Distiller 指令指南】",
             _SEP,
             "",
             "🔍 搜尋與瀏覽",
-            "• top [N]       查看評分最高榜單",
-            "• 搜尋 <關鍵字>  找尋品名、品牌、描述",
-            "• 詳情 <名稱>    完整資訊與風味圖譜",
-            "• 列表 [產地] [分數]  篩選特定條件",
+            "  • top [N]       查看專家評分榜單",
+            "  • 搜尋 <關鍵字>  找尋品名、品牌、描述",
+            "  • 詳情 <名稱>    完整資訊與風味圖譜",
+            "  • 列表 [產地] [分數]  篩選特定條件",
             "",
             "📊 數據統計",
-            "• 統計          資料庫數據摘要",
-            "• 風味 [名稱]    特定風味維度排行",
-            "",
-            "🍹 雞尾酒推薦 (AI)",
-            "• 雞尾酒 <酒名> [偏好描述]",
-            "  例：雞尾酒 Negroni 喜歡花香清爽",
-            "• 雞尾酒 清單    查看支援酒款",
+            "  • 統計          資料庫數據摘要",
+            "  • 風味 [名稱]    特定風味維度排行",
             "",
             "📖 酒譜查詢 (Difford's)",
-            "• 酒譜 <酒名>    食材、作法、歷史",
-            "  例：酒譜 Margarita",
+            "  • 酒譜 <酒名>    食材、作法、歷史",
+            "    例：酒譜 Margarita",
             "",
             "🍸 調酒查詢 (Difford's)",
-            "• 調酒排行 [N]         評分最高的雞尾酒",
-            "• 調酒搜尋 <關鍵字>    搜尋雞尾酒名稱",
-            "• 調酒詳情 <名稱>      完整酒譜與評分",
-            "• 調酒統計             Difford's 資料庫摘要",
-            "• 調酒列表 [--ingredient/--tag/--rating]  篩選調酒",
-            "• 我能做什麼           根據收藏推薦可調製的雞尾酒",
+            "  • 調酒排行 [N]    評分最高的雞尾酒",
+            "  • 調酒搜尋 <關鍵字> 搜尋雞尾酒名稱",
+            "  • 調酒詳情 <名稱>   完整酒譜與評分",
+            "  • 調酒統計        資料庫數據摘要",
+            "  • 調酒列表 [--ingredient/--tag/--rating]  篩選調酒",
+            "  • 我能做什麼      根據收藏推薦可調製項目",
             "",
             "🤖 系統指令",
-            "• 執行 distiller <模式>  Distiller 爬蟲 (test/medium/full)",
-            "• 執行 diffords <模式>   Difford's 爬蟲 (test/incremental/full)",
-            "• 執行狀態               查看兩個爬蟲執行狀態",
-            "• 說明                   顯示本指南",
+            "  • 執行狀態        查看爬蟲執行狀態",
+            "  • 說明            顯示本指南",
             "",
             "💡 提示：輸入關鍵字的一部分即可搜尋！",
         ]
@@ -1110,20 +990,6 @@ def parse_command(text: str) -> tuple[str, list[str | int | None]]:
         filter_type = m.group(3) if m.group(3) else None
         filter_value = m.group(4).strip() if m.group(4) else None
         return "cocktail_list_filter", [filter_type, filter_value]
-
-    # 雞尾酒推薦（支援：雞尾酒 <酒名>、雞尾酒 <酒名> <偏好>、調酒 <酒名>）
-    m = re.match(r"^(雞尾酒|調酒|cocktail)\s+(清單|list)$", text, re.IGNORECASE)
-    if m:
-        return "cocktail_list", []
-
-    m = re.match(r"^(雞尾酒|調酒|cocktail)\s+(.+)$", text, re.IGNORECASE)
-    if m:
-        rest = m.group(2).strip()
-        # 嘗試拆分「酒名 偏好描述」：偏好以空白隔開，兩字以上才算偏好
-        parts = rest.split(None, 1)
-        cocktail_name = parts[0]
-        pref_text = parts[1] if len(parts) > 1 else None
-        return "cocktail", [cocktail_name, pref_text]
 
     # 酒譜查詢（Difford's Guide）
     m = re.match(r"^(酒譜|酒方|recipe)\s+(.+)$", text, re.IGNORECASE)
@@ -1286,15 +1152,6 @@ def _handle(
             else:
                 min_score = None
             return fmt_list(db_path, country, min_score)
-        elif command == "cocktail":
-            cocktail_name = str(args[0]) if args[0] else ""
-            pref_text = str(args[1]) if len(args) > 1 and args[1] else None
-            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
-            return fmt_cocktail(
-                db_path, cocktail_name, pref_text, diffords_db_path=diffords_db_path
-            )
-        elif command == "cocktail_list":
-            return _fmt_cocktail_recommend_list()
         elif command == "recipe":
             query = str(args[0]) if args else ""
             if not query:

@@ -2,6 +2,20 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.13.0] - 2026-04-13
+
+### 移除
+- **雞尾酒推薦模組**（`distiller_scraper/recommender.py`、`distiller_scraper/cocktail_db.py`）
+  - 移除 `CocktailRecommender`、`CocktailRecommendation`、`format_recommendation` 等類別與函式
+  - 移除 29 款經典雞尾酒知識庫（Negroni、Manhattan、Old Fashioned 等）
+  - 移除 `bot.py` 中的 `fmt_cocktail()`、`_fmt_cocktail_recommend_list()` 函式
+  - 移除 `parse_command` 中的 `雞尾酒`/`cocktail` 指令路由及 `_TWIST_KEYWORDS` 常數
+  - 移除 help 訊息中的「🍹 雞尾酒推薦 (AI)」區塊
+  - 移除相關測試：`tests/unit/test_recommender.py`（412 行）及 `test_bot.py` 中的 `TestDiffordsEnrichment`
+
+### 測試
+- 總測試數：468 passed（較前版 -34，均為刪除的推薦模組測試）
+
 ## [2.12.0] - 2026-04-13
 
 ### 新增
