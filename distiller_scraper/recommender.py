@@ -452,13 +452,14 @@ COST_SYMBOLS = {1: "$", 2: "$$", 3: "$$$", 4: "$$$$", 5: "$$$$$"}
 
 def format_recommendation(result: CocktailRecommendation) -> str:
     """將推薦結果格式化為 LINE Bot 文字訊息。"""
-    _SEP_LINE = "──────────────────"
+    _SEP_LINE = "━━━━━━━━━━━━━━"
+    _SEP_LIGHT = "──────────────"
     lines: list[str] = []
 
     twist_label = " (Twist 變化版)" if result.allow_twist else ""
-    lines.append(f"🍹 {result.cocktail_name}{twist_label} 推薦")
+    lines.append(f"🍹 【{result.cocktail_name}{twist_label}】")
     lines.append(f"✨ 風格：{result.flavor_style}")
-    lines.append(f"📝 {result.cocktail_description}")
+    lines.append(f"『{result.cocktail_description}』")
 
     # 顯示酒譜
     if result.recipe:
@@ -470,7 +471,8 @@ def format_recommendation(result: CocktailRecommendation) -> str:
             meta_parts.append(f"🥄 {result.method}")
         if meta_parts:
             lines.append("  ".join(meta_parts))
-        lines.append("📋 經典酒譜：")
+        
+        lines.append("📋 經典酒譜")
         for item in result.recipe:
             note = f" ({item['note']})" if item.get("note") else ""
             lines.append(f"  • {item['item']:<12} {item['amount']}{note}")
@@ -482,7 +484,7 @@ def format_recommendation(result: CocktailRecommendation) -> str:
 
         if ing.recommend_mode == MODE_STATIC_ONLY:
             fb = ing.static_fallback or {}
-            usage = f" (用量：{fb['usage']})" if fb.get("usage") else ""
+            usage = f" ({fb['usage']})" if fb.get("usage") else ""
             lines.append(f"  📌 {fb.get('name', '—')}{usage}")
             if fb.get("note"):
                 lines.append(f"     💡 {fb.get('note')}")
@@ -495,7 +497,7 @@ def format_recommendation(result: CocktailRecommendation) -> str:
                 abv_str = f"{c.abv}%" if c.abv else ""
                 meta = " | ".join(filter(None, [score_str, abv_str, cost, c.country]))
                 
-                # 依類型決定圖示 (簡化版)
+                # 依類型決定圖示
                 s_type = c.spirit_type.lower()
                 icon = "🥃"
                 if "gin" in s_type: icon = "🧊"

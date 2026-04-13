@@ -755,7 +755,7 @@ class TestFmtRecipe:
         result = fmt_recipe(diffords_db, "Negroni")
         assert "Negroni" in result
         assert "Campari" in result
-        assert "食材" in result
+        assert "調製配方" in result
 
     def test_not_found_returns_hint(self, diffords_db):
         from bot import fmt_recipe
@@ -775,14 +775,14 @@ class TestFmtRecipe:
         from bot import fmt_recipe
 
         result = fmt_recipe(diffords_db, "Negroni")
-        assert "歷史" in result
+        assert "經典背景" in result
         assert "1919" in result
 
     def test_review_shown(self, diffords_db):
         from bot import fmt_recipe
 
         result = fmt_recipe(diffords_db, "Negroni")
-        assert "評語" in result
+        assert "專業評語" in result
 
 
 class TestHandleRecipe:

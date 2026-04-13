@@ -294,12 +294,12 @@ def fmt_top(db_path: str, n: int = 10) -> str:
         return "📭 資料庫目前沒有符合的評分資料。"
     lines: list[str] = [f"🏆 Distiller 專家評分榜 Top {n}", _SEP]
     for i, r in enumerate(rows, 1):
-        score = r.get("expert_score")
-        bar = _score_bar(int(score) if isinstance(score, (int, float)) else None)
         rank = _MEDALS.get(i, f"{i:>2}.")
-        lines.append(f"{rank} {r['name']}")
-        lines.append(f"   {r['spirit_type']} ・ {r['country']}")
-        lines.append(f"   {bar} {r['expert_score']}分")
+        score = r.get("expert_score")
+        score_val = int(score) if isinstance(score, (int, float)) else 0
+        lines.append(f"{rank} 【{r['name']}】")
+        lines.append(f"   └ 🥃 {r['spirit_type']} ({score_val}分)")
+        lines.append(f"   └ 🌍 {r['country']}")
         lines.append("")
     lines.append("💡 傳送『詳情 <酒名>』查看風味圖譜")
     return "\n".join(lines)
@@ -323,10 +323,11 @@ def fmt_search(db_path: str, keyword: str, limit: int = 10) -> str:
         return f"❓ 找不到符合「{keyword}」的烈酒，請嘗試縮短關鍵字。"
     lines: list[str] = [f"🔍 搜尋「{keyword}」：{len(rows)} 筆", _SEP_LIGHT]
     for r in rows:
-        score = _fmt_score(r.get("expert_score"))
-        lines.append(f"・{r['name']}")
-        lines.append(f"  {r['spirit_type']} ・ {r['country']}")
-        lines.append(f"  {score}")
+        score = r.get("expert_score")
+        score_val = f" ({int(score)}分)" if isinstance(score, (int, float)) else ""
+        lines.append(f"・【{r['name']}】")
+        lines.append(f"  └ 🥃 {r['spirit_type']}{score_val}")
+        lines.append(f"  └ 🌍 {r['country']}")
         lines.append("")
     lines.append("💡 傳送『詳情 <酒名>』了解更多")
     return "\n".join(lines)
@@ -342,10 +343,7 @@ def fmt_info(db_path: str, name: str) -> str:
         return f"❓ 找不到名稱包含「{name}」的烈酒。"
     row = dict(row)
     cost_level = row.get("cost_level")
-    if isinstance(cost_level, int):
-        price_text = "$" * cost_level
-    else:
-        price_text = "—"
+    price_text = "$" * cost_level if isinstance(cost_level, int) else "—"
     score_value = row.get("expert_score")
     score_text = score_value if isinstance(score_value, (int, float)) else "—"
     score_bar = _score_bar(
@@ -355,36 +353,30 @@ def fmt_info(db_path: str, name: str) -> str:
     # 依類型決定圖示
     s_type = (row.get("spirit_type") or "").lower()
     icon = "🥃"
-    if "gin" in s_type:
-        icon = "🧊"
-    elif "vodka" in s_type:
-        icon = "❄️"
-    elif "rum" in s_type:
-        icon = "🏴‍☠️"
-    elif "tequila" in s_type:
-        icon = "🌵"
-    elif "brandy" in s_type or "cognac" in s_type:
-        icon = "🍷"
+    if "gin" in s_type: icon = "🧊"
+    elif "vodka" in s_type: icon = "❄️"
+    elif "rum" in s_type: icon = "🏴‍☠️"
+    elif "tequila" in s_type: icon = "🌵"
+    elif "brandy" in s_type or "cognac" in s_type: icon = "🍷"
 
     lines: list[str] = [
-        f"{icon} {row['name']}",
+        f"✨ 【{row['name']}】 ✨",
         _SEP,
-        f"🏷️ 類型　{row.get('spirit_type') or '—'}",
-        f"🏢 品牌　{row.get('brand') or '—'}",
-        f"🌍 產地　{row.get('country') or '—'}",
-        f"📅 年份　{row.get('age') or '—'}",
-        f"🍺 ABV 　{row.get('abv') or '—'}%",
-        f"💰 價位　{price_text}",
+        "📜 基本資料",
+        f"  • 類型：{row.get('spirit_type') or '—'}",
+        f"  • 品牌：{row.get('brand') or '—'} / {row.get('age') or 'NAS'}",
+        f"  • 規格：{row.get('abv') or '—'}% ABV / {price_text}",
+        f"  • 產地：{row.get('country') or '—'}",
         "",
-        f"🎖️ 專家評分　{score_text} 分",
-        f"📊 {score_bar}",
-        f"👥 社群評分　{row.get('community_score') or '—'}（{row.get('review_count') or 0} 評論）",
+        f"🎖️ 專家評分：{score_text} 分",
+        f"  📊 {score_bar}",
+        f"👥 社群評分：{row.get('community_score') or '—'} ({row.get('review_count') or 0} 評論)",
     ]
     tasting_notes = row.get("tasting_notes")
     if isinstance(tasting_notes, str) and tasting_notes:
         lines.append("")
         lines.append("👃 品飲筆記")
-        lines.append(f"{tasting_notes[:200]}")
+        lines.append(f"{_truncate(tasting_notes, 200)}")
 
     flavors = cast(
         list[sqlite3.Row],
@@ -403,8 +395,7 @@ def fmt_info(db_path: str, name: str) -> str:
         for f in flavors:
             value = f.get("flavor_value", 0)
             bar = _score_bar(int(value), width=6)
-            pct = f"{int(value)}%"
-            lines.append(f"  {f['flavor_name']:<10} {bar} {pct}")
+            lines.append(f"  {f['flavor_name']:<10} {bar} {int(value)}%")
     return "\n".join(lines)
 
 
@@ -437,20 +428,20 @@ def fmt_stats(db_path: str) -> str:
     lines: list[str] = [
         "📊 Distiller 數據概覽",
         _SEP,
-        f"📈 總藏酒量　{total} 筆",
-        f"⭐ 平均得分　{avg} 分",
-        f"📏 分數區間　{lo} ~ {hi} 分",
+        f"📈 總藏酒量：{total} 筆",
+        f"⭐ 平均得分：{avg} 分",
+        f"📏 分數區間：{lo} ~ {hi} 分",
         "",
         "📋 熱門類型",
         _SEP_LIGHT,
     ]
     for r in types:
-        lines.append(f"  {r[0]:<12} {r[1]:>4} 筆")
+        lines.append(f"  • {r[0]:<12} {r[1]:>4} 筆")
     lines.append("")
     lines.append("🌍 主要產地")
     lines.append(_SEP_LIGHT)
     for r in countries:
-        lines.append(f"  {r[0]:<12} {r[1]:>4} 筆")
+        lines.append(f"  • {r[0]:<12} {r[1]:>4} 筆")
     return "\n".join(lines)
 
 
@@ -474,9 +465,8 @@ def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -
         for i, r in enumerate(rows, 1):
             value = r.get("flavor_value", 0)
             bar = _score_bar(int(value), width=6)
-            pct = f"{int(value)}%"
-            lines.append(f"{i:>2}. {r['name']}")
-            lines.append(f"    {bar} {pct} | 專家 {r['expert_score']} 分")
+            lines.append(f"{i:>2}. 【{r['name']}】")
+            lines.append(f"    └ {bar} {int(value)}% | ⭐ {r['expert_score']}分")
             lines.append("")
         return "\n".join(lines)
     else:
@@ -493,8 +483,7 @@ def fmt_flavors(db_path: str, flavor_name: str | None = None, limit: int = 10) -
         for r in rows:
             avg_value = r.get("avg", 0)
             bar = _score_bar(int(avg_value), width=6)
-            pct = f"{int(avg_value)}%"
-            lines.append(f"  {r['flavor_name']:<12} {bar} {pct}")
+            lines.append(f"  • {r['flavor_name']:<12} {bar} {int(avg_value)}%")
         return "\n".join(lines)
 
 
@@ -536,10 +525,11 @@ def fmt_list(
     title = "・".join(title_parts) if title_parts else "全部"
     lines: list[str] = [f"📋 烈酒列表 ({title})", _SEP_LIGHT]
     for r in rows:
-        score = _fmt_score(r.get("expert_score"))
-        lines.append(f"・{r['name']}")
-        lines.append(f"  {r['spirit_type']} ・ {r['country']}")
-        lines.append(f"  {score}")
+        score = r.get("expert_score")
+        score_val = f" ({int(score)}分)" if isinstance(score, (int, float)) else ""
+        lines.append(f"・【{r['name']}】")
+        lines.append(f"  └ 🥃 {r['spirit_type']}{score_val}")
+        lines.append(f"  └ 🌍 {r['country']}")
         lines.append("")
     if total > limit:
         lines.append(f"（顯示前 {limit} 筆 / 共 {total} 筆）")
@@ -561,15 +551,15 @@ def _fmt_scraper_status(label: str, lock: threading.Lock, state: dict) -> str:
                 elapsed_str = f"{m} 分 {s} 秒"
             except (ValueError, TypeError):
                 pass
-        return f"🔄 {label}：執行中（{mode} 模式，已 {elapsed_str}）"
-    return f"💤 {label}：閒置"
+        return f"🔄 {label}：執行中 ({mode} 模式)\n   └ 已耗時 {elapsed_str}"
+    return f"💤 {label}：閒置中"
 
 
 def fmt_run_status() -> str:
     """回傳兩個爬蟲目前的執行狀態。"""
     distiller_line = _fmt_scraper_status("Distiller", _scrape_lock, _scrape_state)
     diffords_line = _fmt_scraper_status("Difford's", _diffords_lock, _diffords_state)
-    return "\n".join(["📡 爬蟲執行狀態", _SEP_LIGHT, distiller_line, diffords_line])
+    return "\n".join(["📡 系統執行狀態", _SEP, distiller_line, "", diffords_line])
 
 
 _TWIST_KEYWORDS = {"twist", "variation", "變化", "創意", "非傳統", "特色"}
@@ -596,7 +586,7 @@ def fmt_recipe(diffords_db_path: str, query: str) -> str:
                     )
                     lines.append(f"• {r['name']}{rating}")
                 lines.append("")
-                lines.append("傳送「酒譜 <確切名稱>」查看詳情。")
+                lines.append("💡 提示：傳送「酒譜 <確切名稱>」查看詳情。")
                 return "\n".join(lines)
 
         return _fmt_recipe_detail(cocktail)
@@ -604,46 +594,46 @@ def fmt_recipe(diffords_db_path: str, query: str) -> str:
 
 def _fmt_recipe_detail(c: dict) -> str:
     """將單筆 Difford's 雞尾酒資料格式化為 LINE 訊息。"""
-    lines = [f"🍸 {c['name']}", _SEP]
+    lines = [f"🍸 【{c['name']}】", _SEP]
 
     if c.get("description"):
-        lines.append(c["description"])
+        lines.append(f"『{c['description']}』")
         lines.append("")
 
-    # 評分
+    # 評分與基本資訊
+    meta_parts = []
     if c.get("rating_value"):
-        count_str = f"（{c['rating_count']} 評）" if c.get("rating_count") else ""
-        lines.append(f"⭐ {c['rating_value']:.1f}/5 {count_str}")
-
-    # 基本資訊
-    info_parts = []
-    if c.get("glassware"):
-        info_parts.append(f"🥂 {c['glassware']}")
+        meta_parts.append(f"⭐ {c['rating_value']:.1f}/5")
     if c.get("abv"):
-        info_parts.append(f"🍺 ABV {c['abv']:.1f}%")
+        meta_parts.append(f"🍺 {c['abv']:.1f}%")
     if c.get("calories"):
-        info_parts.append(f"🔥 {c['calories']} kcal")
-    if info_parts:
-        lines.append("  ".join(info_parts))
+        meta_parts.append(f"🔥 {c['calories']} kcal")
+    
+    if meta_parts:
+        lines.append(" | ".join(meta_parts))
+
+    if c.get("glassware") or c.get("prepare"):
+        glass = f"🥂 {c['glassware']}" if c.get("glassware") else ""
+        prep = f"🧊 {c['prepare']}" if c.get("prepare") else ""
+        lines.append(f"{glass}  {prep}".strip())
+    
     lines.append("")
 
     # 食材
     ingredients = c.get("ingredients") or []
     if ingredients:
-        lines.append("📋 食材")
+        lines.append("📋 調製配方")
         for ing in ingredients:
             amount = ing.get("amount", "").strip()
             item = ing.get("item", "").strip()
             generic = ing.get("item_generic", "")
-            generic_str = f"（{generic}）" if generic and generic != item else ""
+            generic_str = f" ({generic})" if generic and generic != item else ""
             lines.append(f"  • {amount} {item}{generic_str}".rstrip())
         lines.append("")
 
     # 調製方式
-    if c.get("prepare"):
-        lines.append(f"🧊 前置：{c['prepare']}")
     if c.get("instructions"):
-        lines.append("📝 作法")
+        lines.append("📝 作法步驟")
         lines.append(c["instructions"])
     if c.get("garnish"):
         lines.append(f"🌿 裝飾：{c['garnish']}")
@@ -651,16 +641,16 @@ def _fmt_recipe_detail(c: dict) -> str:
 
     # 歷史與評論（節錄）
     if c.get("history"):
-        lines.append("📖 歷史")
-        lines.append(_truncate(c["history"], 200))
+        lines.append("📖 經典背景")
+        lines.append(f"{_truncate(c['history'], 200)}")
         lines.append("")
     if c.get("review"):
-        lines.append("💬 評語")
-        lines.append(_truncate(c["review"], 150))
+        lines.append("💬 專業評語")
+        lines.append(f"{_truncate(c['review'], 150)}")
         lines.append("")
 
     if c.get("url"):
-        lines.append(f"🔗 {c['url']}")
+        lines.append(f"🔗 完整網頁：{c['url']}")
 
     return "\n".join(lines)
 
@@ -684,14 +674,9 @@ def fmt_cocktail_top(diffords_db_path: str, n: int = 10) -> str:
     lines: list[str] = [f"🍸 Difford's 評分榜 Top {n}", _SEP]
     for i, r in enumerate(results, 1):
         rank = _MEDALS.get(i, f"{i:>2}.")
-        lines.append(f"{rank} {r['name']}")
-        if r.get("rating_value"):
-            rating_str = f"   ⭐ {r['rating_value']:.1f}/5"
-            if r.get("rating_count"):
-                rating_str += f"（{r['rating_count']} 評）"
-        else:
-            rating_str = "   （暫無評分）"
-        lines.append(rating_str)
+        rating_str = f"⭐ {r['rating_value']:.1f}/5" if r.get("rating_value") else "暫無評分"
+        lines.append(f"{rank} 【{r['name']}】")
+        lines.append(f"   └ {rating_str}")
         lines.append("")
     lines.append("💡 傳送『調酒詳情 <名稱>』查看完整酒譜")
     return "\n".join(lines)

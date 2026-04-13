@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 LINE_TOKEN_URL = "https://api.line.me/v2/oauth/accessToken"
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 
-_SEP = "━" * 16
-_SEP_LIGHT = "─" * 16
+_SEP = "━━━━━━━━━━━━━━"
+_SEP_LIGHT = "──────────────"
 
 
 def _fmt_duration(secs: int) -> str:
@@ -124,23 +124,23 @@ class LineNotifier:
         failed = stats.get("失敗 URL 數", stats.get("failed_urls", "?"))
         categories = stats.get("類別分布", stats.get("category_distribution", {}))
         lines = [
-            f"✅ {source} 數據更新報告",
+            f"✅ 【{source} 數據更新成功】",
             _SEP,
-            f"📅 時間　{self._timestamp()}",
+            f"📅 時間：{self._timestamp()}",
+            f"⚙️ 模式：{mode.upper()}",
         ]
         if duration_secs > 0:
-            lines.append(f"⏱ 耗時　{_fmt_duration(duration_secs)}")
-        lines.extend(
-            [
-                f"⚙️ 模式　{mode.upper()}",
-                "",
-                "📈 執行數據",
-                f"  • 總記錄數　{total}",
-                f"  • 失敗連結　{failed}",
-            ]
-        )
+            lines.append(f"⏱ 耗時：{_fmt_duration(duration_secs)}")
+        
+        lines.extend([
+            "",
+            "📈 執行數據",
+            f"  • 總記錄數：{total}",
+            f"  • 失敗連結：{failed}",
+        ])
         if page_errors > 0:
-            lines.append(f"  • 頁面錯誤　{page_errors}")
+            lines.append(f"  • 頁面錯誤：{page_errors}")
+
         if categories:
             cat_total = (
                 sum(categories.values())
@@ -157,11 +157,8 @@ class LineNotifier:
                     lines.append(f"  {k:<10} {bar} {v}")
                 else:
                     lines.append(f"  {k:<10} {v}")
-        else:
-            lines.append("  • 類別分布　無數據")
 
-        text = "\n".join(lines)
-        return self.send(text)
+        return self.send("\n".join(lines))
 
     def notify_failure(
         self,
@@ -173,21 +170,22 @@ class LineNotifier:
         source: str = "Distiller",
     ) -> bool:
         lines: list[str] = [
-            f"❌ {source} 執行異常中斷",
+            f"❌ 【{source} 執行異常中斷】",
             _SEP,
-            f"📅 時間　{self._timestamp()}",
+            f"📅 時間：{self._timestamp()}",
+            f"⚙️ 模式：{mode.upper()}",
         ]
         if duration_secs > 0:
-            lines.append(f"⏱ 耗時　{_fmt_duration(duration_secs)}")
-        lines.extend(
-            [
-                f"⚙️ 模式　{mode.upper()}",
-                f"⚠️ 錯誤原因",
-                f"  {error or '未知錯誤，請查看系統日誌。'}",
-            ]
-        )
+            lines.append(f"⏱ 耗時：{_fmt_duration(duration_secs)}")
+        
+        lines.extend([
+            "",
+            "⚠️ 錯誤原因",
+            f"  {error or '未知錯誤，請查看系統日誌。'}",
+        ])
         if page_errors > 0:
             lines.append(f"  頁面錯誤數：{page_errors}")
+        
         if error_details:
             lines.append("")
             lines.append("📋 異常詳情")
@@ -197,12 +195,12 @@ class LineNotifier:
 
     def notify_skipped(self, mode: str, last_run_at: str = "", source: str = "Distiller") -> bool:
         lines: list[str] = [
-            f"⏭️ {source} 更新任務跳過",
+            f"⏭️ 【{source} 更新任務跳過】",
             _SEP,
-            f"📅 時間　{self._timestamp()}",
+            f"📅 時間：{self._timestamp()}",
+            f"⚙️ 模式：{mode.upper()}",
             "",
-            f"⚙️ 模式　{mode.upper()}",
-            "💡 原因",
+            "💡 跳過原因",
             f"  系統於 {ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS} 小時內已有成功紀錄",
         ]
         if last_run_at:
