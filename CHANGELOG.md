@@ -2,6 +2,27 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.12.0] - 2026-04-13
+
+### 新增
+- **LINE Bot 爬蟲個別觸發指令**（`bot.py`）
+  - `執行 distiller <test|medium|full>`：手動觸發 Distiller.com 爬蟲
+  - `執行 diffords <test|incremental|full>`：手動觸發 Difford's Guide 爬蟲
+  - `執行狀態` 同時顯示兩個爬蟲的執行狀態
+  - 向下相容：`執行 <mode>` 仍觸發 Distiller 爬蟲
+
+### 修復
+- **TOCTOU 競態條件**：running 狀態的檢查與設定合併為原子操作（同一個 lock 內完成），避免並發請求重複啟動爬蟲
+
+### 重構
+- 將重複的 `_start_scraper_thread` / `_start_diffords_thread` 合併為通用 `_launch_scraper_thread(cmd, lock, state)`
+- 將重複的 `_start_scraper_cloud_run` / `_start_diffords_cloud_run` 合併為通用 `_launch_cloud_run_job(job_name_env, default_job, cmd_args)`
+- 爬蟲狀態現由呼叫端在 lock 內原子設定，`_start_scraper` / `_start_diffords` 僅負責分派
+
+### 測試
+- 更新 `test_authorized_launches_scraper`：mock 目標改為 `bot._start_scraper`（對應重構後的介面）
+- 總測試數：502 passed（無退步）
+
 ## [2.11.0] - 2026-04-13
 
 ### 新增

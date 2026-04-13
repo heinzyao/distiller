@@ -664,7 +664,7 @@ class TestHandleRunScrape:
 
     def test_authorized_launches_scraper(self, db_path):
         with (
-            patch("bot._start_scraper_thread") as mock_start,
+            patch("bot._start_scraper") as mock_start,
             patch.dict(os.environ, {"LINE_USER_ID": "user123"}),
         ):
             result = _handle("執行 test", db_path, user_id="user123")
@@ -686,7 +686,7 @@ class TestHandleRunScrape:
         bot._scrape_state["started_at"] = "2026-03-17T03:00:00"
         result = _handle("執行狀態", db_path)
         assert "full" in result
-        assert "已執行" in result
+        assert "Distiller" in result
 
 
 # ---------------------------------------------------------------------------

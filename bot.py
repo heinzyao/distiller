@@ -87,6 +87,14 @@ _scrape_state: dict = {
     "started_at": None,
 }
 
+# Difford's Guide 爬蟲執行狀態
+_diffords_lock = threading.Lock()
+_diffords_state: dict = {
+    "running": False,
+    "mode": None,
+    "started_at": None,
+}
+
 
 # ---------------------------------------------------------------------------
 # LINE API 輔助
@@ -163,42 +171,28 @@ def _reply(reply_token: str, text: str, access_token: str) -> bool:
         return False
 
 
-def _start_scraper_thread(mode: str, db_path: str) -> None:
-    """在背景執行緒中啟動爬蟲，完成後由 run.py --notify-line 自動推播通知。"""
-    run_py = str(Path(__file__).parent / "run.py")
-    cmd = [
-        sys.executable,
-        run_py,
-        "--mode",
-        mode,
-        "--output",
-        "sqlite",
-        "--db-path",
-        db_path,
-        "--notify-line",
-    ]
-
+def _launch_scraper_thread(
+    cmd: list[str], lock: threading.Lock, state: dict
+) -> None:
+    """在背景執行緒中執行爬蟲指令；完成後清除執行狀態。"""
     def _run() -> None:
-        with _scrape_lock:
-            _scrape_state["running"] = True
-            _scrape_state["mode"] = mode
-            _scrape_state["started_at"] = datetime.now().isoformat(timespec="seconds")
         try:
             subprocess.run(cmd, capture_output=False)
         finally:
-            with _scrape_lock:
-                _scrape_state["running"] = False
-                _scrape_state["mode"] = None
+            with lock:
+                state["running"] = False
+                state["mode"] = None
 
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
+    threading.Thread(target=_run, daemon=True).start()
 
 
-def _start_scraper_cloud_run(mode: str) -> None:
-    """觸發 Cloud Run Job 執行爬蟲（Cloud Run 環境專用）。"""
+def _launch_cloud_run_job(
+    job_name_env: str, default_job: str, cmd_args: list[str]
+) -> None:
+    """觸發 Cloud Run Job（Cloud Run 環境專用）。"""
     project = os.getenv("GOOGLE_CLOUD_PROJECT", os.getenv("GCLOUD_PROJECT", ""))
     region = os.getenv("CLOUD_RUN_REGION", "asia-east1")
-    job_name = os.getenv("SCRAPER_JOB_NAME", "distiller-scraper")
+    job_name = os.getenv(job_name_env, default_job)
 
     from google.cloud import run_v2  # type: ignore[import]
 
@@ -206,32 +200,45 @@ def _start_scraper_cloud_run(mode: str) -> None:
     name = f"projects/{project}/locations/{region}/jobs/{job_name}"
     overrides = run_v2.RunJobRequest.Overrides(
         container_overrides=[
-            run_v2.RunJobRequest.Overrides.ContainerOverride(
-                args=[
-                    "--mode",
-                    mode,
-                    "--output",
-                    "sqlite",
-                    "--use-api",
-                    "--notify-line",
-                ]
-            )
+            run_v2.RunJobRequest.Overrides.ContainerOverride(args=cmd_args)
         ]
     )
     client.run_job(request=run_v2.RunJobRequest(name=name, overrides=overrides))
-    logger.info("Cloud Run Job 已觸發：%s (mode=%s)", name, mode)
+    logger.info("Cloud Run Job 已觸發：%s", name)
 
 
 def _start_scraper(mode: str, db_path: str) -> None:
-    """啟動爬蟲：Cloud Run 環境使用 Jobs API，本機使用 subprocess 執行緒。"""
+    """啟動 Distiller 爬蟲；狀態已由呼叫端在 lock 內設定。"""
     if GCS_BUCKET and os.getenv("GOOGLE_CLOUD_PROJECT"):
-        _start_scraper_cloud_run(mode)
-        with _scrape_lock:
-            _scrape_state["running"] = True
-            _scrape_state["mode"] = mode
-            _scrape_state["started_at"] = datetime.now().isoformat(timespec="seconds")
+        _launch_cloud_run_job(
+            "SCRAPER_JOB_NAME",
+            "distiller-scraper",
+            ["--mode", mode, "--output", "sqlite", "--use-api", "--notify-line"],
+        )
     else:
-        _start_scraper_thread(mode, db_path)
+        cmd = [
+            sys.executable,
+            str(Path(__file__).parent / "run.py"),
+            "--mode", mode, "--output", "sqlite", "--db-path", db_path, "--notify-line",
+        ]
+        _launch_scraper_thread(cmd, _scrape_lock, _scrape_state)
+
+
+def _start_diffords(mode: str, db_path: str) -> None:
+    """啟動 Difford's 爬蟲；狀態已由呼叫端在 lock 內設定。"""
+    if GCS_BUCKET and os.getenv("GOOGLE_CLOUD_PROJECT"):
+        _launch_cloud_run_job(
+            "DIFFORDS_JOB_NAME",
+            "distiller-diffords",
+            ["--mode", mode, "--notify-line"],
+        )
+    else:
+        cmd = [
+            sys.executable,
+            str(Path(__file__).parent / "run_diffords.py"),
+            "--mode", mode, "--db-path", db_path, "--notify-line",
+        ]
+        _launch_scraper_thread(cmd, _diffords_lock, _diffords_state)
 
 
 def _ensure_db_from_gcs(db_path: str, blob_name: str = GCS_DB_BLOB) -> bool:
@@ -539,12 +546,12 @@ def fmt_list(
     return "\n".join(lines)
 
 
-def fmt_run_status() -> str:
-    """回傳爬蟲目前執行狀態。"""
-    with _scrape_lock:
-        running = _scrape_state.get("running", False)
-        mode = _scrape_state.get("mode")
-        started_at = _scrape_state.get("started_at")
+def _fmt_scraper_status(label: str, lock: threading.Lock, state: dict) -> str:
+    """格式化單一爬蟲的狀態行。"""
+    with lock:
+        running = state.get("running", False)
+        mode = state.get("mode")
+        started_at = state.get("started_at")
     if running:
         elapsed_str = "—"
         if started_at:
@@ -554,8 +561,15 @@ def fmt_run_status() -> str:
                 elapsed_str = f"{m} 分 {s} 秒"
             except (ValueError, TypeError):
                 pass
-        return f"🔄 爬蟲執行中\n模式：{mode}\n開始時間：{started_at}\n已執行：{elapsed_str}"
-    return "💤 目前無爬蟲執行中"
+        return f"🔄 {label}：執行中（{mode} 模式，已 {elapsed_str}）"
+    return f"💤 {label}：閒置"
+
+
+def fmt_run_status() -> str:
+    """回傳兩個爬蟲目前的執行狀態。"""
+    distiller_line = _fmt_scraper_status("Distiller", _scrape_lock, _scrape_state)
+    diffords_line = _fmt_scraper_status("Difford's", _diffords_lock, _diffords_state)
+    return "\n".join(["📡 爬蟲執行狀態", _SEP_LIGHT, distiller_line, diffords_line])
 
 
 _TWIST_KEYWORDS = {"twist", "variation", "變化", "創意", "非傳統", "特色"}
@@ -1022,9 +1036,10 @@ def fmt_help() -> str:
             "• 我能做什麼           根據收藏推薦可調製的雞尾酒",
             "",
             "🤖 系統指令",
-            "• 執行 <模式>    啟動爬蟲 (test/full)",
-            "• 執行狀態      查看目前進度",
-            "• 說明          顯示本指南",
+            "• 執行 distiller <模式>  Distiller 爬蟲 (test/medium/full)",
+            "• 執行 diffords <模式>   Difford's 爬蟲 (test/incremental/full)",
+            "• 執行狀態               查看兩個爬蟲執行狀態",
+            "• 說明                   顯示本指南",
             "",
             "💡 提示：輸入關鍵字的一部分即可搜尋！",
         ]
@@ -1130,7 +1145,19 @@ def parse_command(text: str) -> tuple[str, list[str | int | None]]:
     if m:
         return "recipe", [m.group(2).strip()]
 
-    # 執行爬蟲
+    # 執行 Distiller 爬蟲（新語法：明確指定來源）
+    m = re.match(r"^(執行|run)\s+distiller\s+(test|medium|full)$", text, re.IGNORECASE)
+    if m:
+        return "run_scrape", [m.group(2).lower()]
+
+    # 執行 Difford's Guide 爬蟲
+    m = re.match(
+        r"^(執行|run)\s+diffords?\s+(test|incremental|full)$", text, re.IGNORECASE
+    )
+    if m:
+        return "run_diffords", [m.group(2).lower()]
+
+    # 向下相容：執行 <mode>（不指定來源，預設為 Distiller）
     m = re.match(r"^(執行|run)\s+(test|medium|full)$", text, re.IGNORECASE)
     if m:
         return "run_scrape", [m.group(2).lower()]
@@ -1296,16 +1323,42 @@ def _handle(
             authorized_user_id = os.getenv("LINE_USER_ID", "")
             if not authorized_user_id or user_id != authorized_user_id:
                 return "⛔ 僅授權使用者可執行爬蟲指令。"
-            with _scrape_lock:
-                if _scrape_state.get("running"):
-                    return f"⚠️ 爬蟲正在執行中（{_scrape_state.get('mode')} 模式），請稍後再試。"
             mode = str(args[0])
+            with _scrape_lock:
+                if _scrape_state["running"]:
+                    return f"⚠️ Distiller 爬蟲正在執行中（{_scrape_state['mode']} 模式），請稍後再試。"
+                _scrape_state["running"] = True
+                _scrape_state["mode"] = mode
+                _scrape_state["started_at"] = datetime.now().isoformat(timespec="seconds")
             try:
                 _start_scraper(mode, db_path)
             except Exception as exc:
-                logger.error("啟動爬蟲失敗：%s", exc)
-                return f"⚠️ 爬蟲啟動失敗：{exc}"
-            return f"🚀 爬蟲已啟動（{mode} 模式），完成後將推播通知您。"
+                with _scrape_lock:
+                    _scrape_state["running"] = False
+                    _scrape_state["mode"] = None
+                logger.error("啟動 Distiller 爬蟲失敗：%s", exc)
+                return f"⚠️ Distiller 爬蟲啟動失敗：{exc}"
+            return f"🚀 Distiller 爬蟲已啟動（{mode} 模式），完成後將推播通知您。"
+        elif command == "run_diffords":
+            authorized_user_id = os.getenv("LINE_USER_ID", "")
+            if not authorized_user_id or user_id != authorized_user_id:
+                return "⛔ 僅授權使用者可執行爬蟲指令。"
+            mode = str(args[0])
+            with _diffords_lock:
+                if _diffords_state["running"]:
+                    return f"⚠️ Difford's 爬蟲正在執行中（{_diffords_state['mode']} 模式），請稍後再試。"
+                _diffords_state["running"] = True
+                _diffords_state["mode"] = mode
+                _diffords_state["started_at"] = datetime.now().isoformat(timespec="seconds")
+            try:
+                _start_diffords(mode, diffords_db_path)
+            except Exception as exc:
+                with _diffords_lock:
+                    _diffords_state["running"] = False
+                    _diffords_state["mode"] = None
+                logger.error("啟動 Difford's 爬蟲失敗：%s", exc)
+                return f"⚠️ Difford's 爬蟲啟動失敗：{exc}"
+            return f"🚀 Difford's 爬蟲已啟動（{mode} 模式），完成後將推播通知您。"
         elif command == "cocktail_top":
             n = int(args[0]) if args and args[0] is not None else 10
             _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)

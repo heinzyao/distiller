@@ -1,3 +1,0 @@
-health status: 200
-health json: {'db_exists': True, 'status': 'ok', 'token_cached': False}
-HEALTH CHECK OK
