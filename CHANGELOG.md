@@ -362,7 +362,7 @@
 
 ### 變更
 - `scripts/run_bot.sh`：從 `venv/bin/python` 遷移至 `uv run python bot.py`
-- `com.distiller.bot.plist`：PATH 新增 `/Users/Henry/.local/bin`（uv 所在路徑）
+- `com.distiller.bot.plist`：PATH 新增 `~/.local/bin`（uv 所在路徑）
 - **總計：259 個單元測試全數通過**（原 242 個 + 17 個新增）
 ## [2.3.1] - 2026-03-01
 

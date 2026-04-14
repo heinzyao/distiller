@@ -4,7 +4,7 @@
 # Runs persistently via launchd (KeepAlive = true)
 # Configuration: com.distiller.bot.plist
 
-PROJECT_DIR="/Users/Henry/Project/Distiller"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="$PROJECT_DIR/logs"
 
 mkdir -p "$LOG_DIR"

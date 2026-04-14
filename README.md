@@ -50,8 +50,8 @@ distiller/
 │   ├── run_diffords.sh         # Difford's Scheduled Scraping Script
 │   └── run_bot.sh             # LINE Bot Launch Script (used for launchd)
 ├── AGENTS.md                  # Multi-agent Collaboration Logs
-├── com.distiller.scraper.plist # Distiller Scheduled Scraping (Daily 3 AM)
-├── com.distiller.diffords.plist  # Difford's launchd Schedule (Weekly)
+├── com.distiller.scraper.plist.example  # Distiller launchd template (copy & edit paths)
+├── com.distiller.diffords.plist.example # Difford's launchd template (copy & edit paths)
 └── CHANGELOG.md               # Changelog
 ```
 
@@ -304,8 +304,8 @@ distiller/
 │   ├── run_diffords.sh         # Difford's 排程爬取腳本
 │   └── run_bot.sh             # Bot 啟動腳本（launchd 用）
 ├── AGENTS.md                  # 多代理協作紀錄
-├── com.distiller.scraper.plist # Distiller 排程爬取（每日凌晨 3 點）
-├── com.distiller.diffords.plist  # Difford's launchd 排程（每週）
+├── com.distiller.scraper.plist.example  # Distiller launchd 範本（複製後填入本機路徑）
+├── com.distiller.diffords.plist.example # Difford's launchd 範本（複製後填入本機路徑）
 └── CHANGELOG.md               # 變更紀錄
 ```
 

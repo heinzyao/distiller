@@ -7,25 +7,25 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/Henry/Project/Distiller/scripts/run_bot.sh</string>
+        <string>/path/to/distiller/scripts/run_bot.sh</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/Henry/Project/Distiller</string>
+    <string>/path/to/distiller</string>
 
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/Users/Henry/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>/home/USERNAME/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
         <key>HOME</key>
-        <string>/Users/Henry</string>
+        <string>/home/USERNAME</string>
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/Henry/Project/Distiller/logs/bot.out</string>
+    <string>/path/to/distiller/logs/bot.out</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/Henry/Project/Distiller/logs/bot.err</string>
+    <string>/path/to/distiller/logs/bot.err</string>
 
     <key>RunAtLoad</key>
     <true/>

@@ -6,7 +6,7 @@
 
 set -eo pipefail
 
-PROJECT_DIR="/Users/Henry/Project/distiller"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # 載入環境變數（LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID 等）
 if [ -f "$PROJECT_DIR/.env" ]; then

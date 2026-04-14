@@ -229,7 +229,7 @@
    - **Webhook 驗證 Probe**：空事件陣列（LINE 驗證請求）直接回 200，不做簽名檢查
    - **Health Check**：新增 `GET /health` 端點，回傳 `{status, db_exists, token_cached}`
    - **啟動驗證**：`__main__` 新增環境變數檢查，缺少憑證時 `sys.exit(1)`
-   - **基礎設施**：`run_bot.sh` 從 `venv/bin/python` 遷移至 `uv run`；`com.distiller.bot.plist` PATH 更新加入 `/Users/Henry/.local/bin`
+   - **基礎設施**：`run_bot.sh` 從 `venv/bin/python` 遷移至 `uv run`；`com.distiller.bot.plist` PATH 更新加入 `~/.local/bin`
 
 2. **新增 17 個單元測試**
    - TestTokenCache（6 個）：首次取得、快取命中、過期重取、即將過期重取、失敗不填快取、成功後快取驗證
@@ -495,7 +495,7 @@ pytest tests/e2e -m "slow or network"
 **接手指南**：
 ```bash
 # 專案根目錄
-cd /Users/Henry/Project/Distiller
+cd /path/to/distiller
 
 # 啟用虛擬環境
 source venv/bin/activate

@@ -4,12 +4,12 @@
 <dict>
     <key>Label</key>
     <string>com.distiller.diffords</string>
-    
+
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/Henry/Project/distiller/scripts/run_diffords.sh</string>
+        <string>/path/to/distiller/scripts/run_diffords.sh</string>
     </array>
-    
+
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
@@ -19,27 +19,27 @@
         <key>Weekday</key>
         <integer>0</integer>
     </dict>
-    
+
     <key>WorkingDirectory</key>
-    <string>/Users/Henry/Project/distiller</string>
-    
+    <string>/path/to/distiller</string>
+
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/Users/Henry/.local/bin:/Users/Henry/Project/distiller/.venv/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>/home/USERNAME/.local/bin:/path/to/distiller/.venv/bin:/usr/local/bin:/usr/bin:/bin</string>
         <key>HOME</key>
-        <string>/Users/Henry</string>
+        <string>/home/USERNAME</string>
     </dict>
-    
+
     <key>StandardOutPath</key>
-    <string>/Users/Henry/Project/distiller/logs/diffords.out</string>
-    
+    <string>/path/to/distiller/logs/diffords.out</string>
+
     <key>StandardErrorPath</key>
-    <string>/Users/Henry/Project/distiller/logs/diffords.err</string>
-    
+    <string>/path/to/distiller/logs/diffords.err</string>
+
     <key>RunAtLoad</key>
     <false/>
-    
+
     <key>KeepAlive</key>
     <false/>
 </dict>
