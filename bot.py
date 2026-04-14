@@ -13,16 +13,22 @@ Distiller LINE Bot
     → 將 Webhook URL 設定於 LINE Developers Console
 
 支援指令（直接在 LINE 傳送）：
-    top [N]           評分 Top N（預設 10）
-    搜尋 <關鍵字>     搜尋品名、品牌、描述
-    詳情 <名稱>       單筆完整資訊（含風味圖譜）
-    統計              資料庫統計摘要
-    風味              所有風味維度排行
-    風味 <名稱>       特定風味最強排行
-    列表              列出所有（前 10 筆）
-    列表 <產地>       依產地篩選
-    列表 <產地> <分數> 依產地與最低分數篩選
-    說明              顯示指令說明
+    烈酒排行 [N]           評分 Top N（預設 10）
+    烈酒搜尋 <關鍵字>      搜尋品名、品牌、描述
+    烈酒詳情 <名稱>        單筆完整資訊（含風味圖譜）
+    烈酒統計              資料庫統計摘要
+    烈酒風味              所有風味維度排行
+    烈酒風味 <名稱>        特定風味最強排行
+    烈酒列表              列出所有（前 10 筆）
+    烈酒列表 <產地>        依產地篩選
+    烈酒列表 <產地> <分數>  依產地與最低分數篩選
+    雞尾酒酒譜 <酒名>      食材、作法、歷史
+    雞尾酒搜尋 <關鍵字>    搜尋雞尾酒名稱
+    雞尾酒詳情 <名稱>      完整酒譜與評分
+    雞尾酒統計            雞尾酒資料庫摘要
+    雞尾酒列表            篩選調酒
+    雞尾酒推薦            根據收藏推薦可調製項目
+    說明                  顯示指令說明
 """
 
 import base64
@@ -659,26 +665,6 @@ _DIFFORDS_DB_MISSING = (
 )
 
 
-def fmt_cocktail_top(diffords_db_path: str, n: int = 10) -> str:
-    if not Path(diffords_db_path).exists():
-        return _DIFFORDS_DB_MISSING
-    from distiller_scraper.diffords_storage import DiffordsStorage
-
-    with DiffordsStorage(diffords_db_path) as storage:
-        results = storage.get_top_rated(limit=n)
-    if not results:
-        return "📭 Difford's 資料庫目前沒有評分資料。"
-    lines: list[str] = [f"🍸 Difford's 評分榜 Top {n}", _SEP]
-    for i, r in enumerate(results, 1):
-        rank = _MEDALS.get(i, f"{i:>2}.")
-        rating_str = f"⭐ {r['rating_value']:.1f}/5" if r.get("rating_value") else "暫無評分"
-        lines.append(f"{rank} 【{r['name']}】")
-        lines.append(f"   └ {rating_str}")
-        lines.append("")
-    lines.append("💡 傳送『調酒詳情 <名稱>』查看完整酒譜")
-    return "\n".join(lines)
-
-
 def fmt_cocktail_search(diffords_db_path: str, keyword: str) -> str:
     if not Path(diffords_db_path).exists():
         return _DIFFORDS_DB_MISSING
@@ -880,31 +866,26 @@ def fmt_help() -> str:
             "🥃 【Distiller 指令指南】",
             _SEP,
             "",
-            "🔍 搜尋與瀏覽",
-            "  • top [N]       查看專家評分榜單",
-            "  • 搜尋 <關鍵字>  找尋品名、品牌、描述",
-            "  • 詳情 <名稱>    完整資訊與風味圖譜",
-            "  • 列表 [產地] [分數]  篩選特定條件",
+            "🥃 烈酒查詢 (Distiller)",
+            "  • 烈酒排行 [N]        查看專家評分榜單",
+            "  • 烈酒搜尋 <關鍵字>   找尋品名、品牌、描述",
+            "  • 烈酒詳情 <名稱>     完整資訊與風味圖譜",
+            "  • 烈酒列表 [產地] [分數]  篩選特定條件",
+            "  • 烈酒統計           資料庫數據摘要",
+            "  • 烈酒風味 [名稱]    特定風味維度排行",
             "",
-            "📊 數據統計",
-            "  • 統計          資料庫數據摘要",
-            "  • 風味 [名稱]    特定風味維度排行",
-            "",
-            "📖 酒譜查詢 (Difford's)",
-            "  • 酒譜 <酒名>    食材、作法、歷史",
-            "    例：酒譜 Margarita",
-            "",
-            "🍸 調酒查詢 (Difford's)",
-            "  • 調酒排行 [N]    評分最高的雞尾酒",
-            "  • 調酒搜尋 <關鍵字> 搜尋雞尾酒名稱",
-            "  • 調酒詳情 <名稱>   完整酒譜與評分",
-            "  • 調酒統計        資料庫數據摘要",
-            "  • 調酒列表 [--ingredient/--tag/--rating]  篩選調酒",
-            "  • 我能做什麼      根據收藏推薦可調製項目",
+            "🍸 雞尾酒查詢 (Difford's)",
+            "  • 雞尾酒酒譜 <酒名>   食材、作法、歷史",
+            "    例：雞尾酒酒譜 Margarita",
+            "  • 雞尾酒搜尋 <關鍵字> 搜尋雞尾酒名稱",
+            "  • 雞尾酒詳情 <名稱>   完整酒譜與評分",
+            "  • 雞尾酒統計         資料庫數據摘要",
+            "  • 雞尾酒列表 [--ingredient/--tag/--rating]  篩選調酒",
+            "  • 雞尾酒推薦         根據收藏推薦可調製項目",
             "",
             "🤖 系統指令",
-            "  • 執行狀態        查看爬蟲執行狀態",
-            "  • 說明            顯示本指南",
+            "  • 執行狀態           查看爬蟲執行狀態",
+            "  • 說明               顯示本指南",
             "",
             "💡 提示：輸入關鍵字的一部分即可搜尋！",
         ]
@@ -924,31 +905,36 @@ def parse_command(text: str) -> tuple[str, list[str | int | None]]:
     if lower in ("說明", "help", "指令", "?", "？"):
         return "help", []
 
-    if lower in ("統計", "stats", "總覽"):
+    # 烈酒統計
+    if lower in ("烈酒統計", "統計", "stats", "總覽"):
         return "stats", []
 
-    if lower in ("風味", "flavors", "flavor"):
+    # 烈酒風味
+    if lower in ("烈酒風味", "風味", "flavors", "flavor"):
         return "flavors", []
 
-    m = re.match(r"^(風味|flavor[s]?)\s+(.+)$", text, re.IGNORECASE)
+    m = re.match(r"^(烈酒風味|風味|flavor[s]?)\s+(.+)$", text, re.IGNORECASE)
     if m:
         return "flavors", [m.group(2).strip()]
 
-    m = re.match(r"^(top|排行)\s*(\d+)?$", lower)
+    # 烈酒排行
+    m = re.match(r"^(烈酒排行|top|排行)\s*(\d+)?$", lower)
     if m:
         n = int(m.group(2)) if m.group(2) else 10
         return "top", [min(n, 20)]
 
-    m = re.match(r"^(搜尋|search|找)\s+(.+)$", text, re.IGNORECASE)
+    # 烈酒搜尋
+    m = re.match(r"^(烈酒搜尋|搜尋|search|找)\s+(.+)$", text, re.IGNORECASE)
     if m:
         return "search", [m.group(2).strip()]
 
-    m = re.match(r"^(詳情|info|查)\s+(.+)$", text, re.IGNORECASE)
+    # 烈酒詳情
+    m = re.match(r"^(烈酒詳情|詳情|info|查)\s+(.+)$", text, re.IGNORECASE)
     if m:
         return "info", [m.group(2).strip()]
 
-    # 列表 [產地] [分數]
-    m = re.match(r"^(列表|list)(\s+(.+?))?(\s+(\d{2,3}))?$", text, re.IGNORECASE)
+    # 烈酒列表 [產地] [分數]
+    m = re.match(r"^(烈酒列表|列表|list)(\s+(.+?))?(\s+(\d{2,3}))?$", text, re.IGNORECASE)
     if m:
         country = m.group(3).strip() if m.group(3) else None
         score = int(m.group(5)) if m.group(5) else None
@@ -958,55 +944,55 @@ def parse_command(text: str) -> tuple[str, list[str | int | None]]:
             country = None
         return "list", [country, score]
 
-    # 調酒統計
-    if lower in ("調酒統計", "cocktail stats"):
+    # 雞尾酒統計
+    if lower in ("雞尾酒統計", "調酒統計", "cocktail stats"):
         return "cocktail_stats", []
 
-    # 調酒排行 [N] / cocktail top [N]
-    m = re.match(r"^(調酒排行|cocktail\s+top)\s*(\d+)?$", text, re.IGNORECASE)
-    if m:
-        n = int(m.group(2)) if m.group(2) else 10
-        return "cocktail_top", [min(n, 20)]
-
-    # 調酒搜尋 <kw> / cocktail search <kw>
-    m = re.match(r"^(調酒搜尋|cocktail\s+search)\s+(.+)$", text, re.IGNORECASE)
+    # 雞尾酒搜尋 <kw> / cocktail search <kw>
+    m = re.match(r"^(雞尾酒搜尋|調酒搜尋|cocktail\s+search)\s+(.+)$", text, re.IGNORECASE)
     if m:
         return "cocktail_search", [m.group(2).strip()]
 
-    # 調酒詳情 <name> / cocktail info <name>
-    m = re.match(r"^(調酒詳情|cocktail\s+info)\s+(.+)$", text, re.IGNORECASE)
+    # 雞尾酒詳情 <name> / cocktail info <name>
+    m = re.match(r"^(雞尾酒詳情|調酒詳情|cocktail\s+info)\s+(.+)$", text, re.IGNORECASE)
     if m:
         return "cocktail_info", [m.group(2).strip()]
 
-    # 我能做什麼 / cocktail makeable / 調酒推薦
-    if lower in ("我能做什麼", "cocktail makeable", "調酒推薦"):
+    # 雞尾酒推薦 / 我能做什麼 / cocktail makeable
+    if lower in ("雞尾酒推薦", "我能做什麼", "cocktail makeable", "調酒推薦"):
         return "cocktail_makeable", []
 
-    # 調酒列表 [--ingredient X | --tag Y | --rating N] / cocktail list [...]
+    # 雞尾酒列表 [--ingredient X | --tag Y | --rating N] / cocktail list [...]
     m = re.match(
-        r"^(調酒列表|cocktail\s+list)(\s+--(\w+)\s+(.+))?$", text, re.IGNORECASE
+        r"^(雞尾酒列表|調酒列表|cocktail\s+list)(\s+--(\w+)\s+(.+))?$", text, re.IGNORECASE
     )
     if m:
         filter_type = m.group(3) if m.group(3) else None
         filter_value = m.group(4).strip() if m.group(4) else None
         return "cocktail_list_filter", [filter_type, filter_value]
 
-    # 酒譜查詢（Difford's Guide）
-    m = re.match(r"^(酒譜|酒方|recipe)\s+(.+)$", text, re.IGNORECASE)
+    # 雞尾酒酒譜（Difford's Guide）
+    m = re.match(r"^(雞尾酒酒譜|酒譜|酒方|recipe)\s+(.+)$", text, re.IGNORECASE)
     if m:
         return "recipe", [m.group(2).strip()]
 
-    # 執行 Distiller 爬蟲（新語法：明確指定來源）
-    m = re.match(r"^(執行|run)\s+distiller\s+(test|medium|full)$", text, re.IGNORECASE)
-    if m:
-        return "run_scrape", [m.group(2).lower()]
-
-    # 執行 Difford's Guide 爬蟲
+    # 烈酒爬蟲（支援新語法「烈酒爬蟲」及舊語法「執行/run distiller」）
     m = re.match(
-        r"^(執行|run)\s+diffords?\s+(test|incremental|full)$", text, re.IGNORECASE
+        r"^(?:烈酒爬蟲|(?:執行|run)\s+distiller)\s+(test|medium|full)$",
+        text,
+        re.IGNORECASE,
     )
     if m:
-        return "run_diffords", [m.group(2).lower()]
+        return "run_scrape", [m.group(1).lower()]
+
+    # 雞尾酒爬蟲（支援新語法「雞尾酒爬蟲」及舊語法「執行/run diffords」）
+    m = re.match(
+        r"^(?:雞尾酒爬蟲|(?:執行|run)\s+diffords?)\s+(test|incremental|full)$",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        return "run_diffords", [m.group(1).lower()]
 
     # 向下相容：執行 <mode>（不指定來源，預設為 Distiller）
     m = re.match(r"^(執行|run)\s+(test|medium|full)$", text, re.IGNORECASE)
@@ -1201,10 +1187,6 @@ def _handle(
                 logger.error("啟動 Difford's 爬蟲失敗：%s", exc)
                 return f"⚠️ Difford's 爬蟲啟動失敗：{exc}"
             return f"🚀 Difford's 爬蟲已啟動（{mode} 模式），完成後將推播通知您。"
-        elif command == "cocktail_top":
-            n = int(args[0]) if args and args[0] is not None else 10
-            _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)
-            return fmt_cocktail_top(diffords_db_path, n)
         elif command == "cocktail_search":
             keyword = str(args[0]) if args else ""
             _ensure_db_from_gcs(diffords_db_path, GCS_DIFFORDS_DB_BLOB)

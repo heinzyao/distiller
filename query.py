@@ -3,14 +3,13 @@
 Distiller 資料庫查詢工具
 
 用法:
-    python query.py list [篩選條件]
-    python query.py search <關鍵字>
-    python query.py top [N]
-    python query.py info <名稱>
-    python query.py stats
-    python query.py flavors [篩選條件]
-    python query.py export <檔案名>
-    python query.py cocktail-top [N]
+    python query.py spirits-list [篩選條件]
+    python query.py spirits-search <關鍵字>
+    python query.py spirits-top [N]
+    python query.py spirits-info <名稱>
+    python query.py spirits-stats
+    python query.py spirits-flavors [篩選條件]
+    python query.py spirits-export <檔案名>
     python query.py cocktail-search <關鍵字>
     python query.py cocktail-info <名稱>
     python query.py cocktail-stats
@@ -431,25 +430,6 @@ def _open_diffords(db_path: str):
     return DiffordsStorage(db_path)
 
 
-def cmd_cocktail_top(args):
-    """顯示評分最高的雞尾酒"""
-    storage = _open_diffords(args.cocktail_db)
-    try:
-        n = args.n or 10
-        results = storage.get_top_rated(limit=n)
-        print(f"\n🍹 Difford's 評分最高 Top {n}\n")
-        if not results:
-            print("（無結果）")
-            return
-        for i, c in enumerate(results, 1):
-            rating = c.get("rating_value")
-            rating_str = f"{rating:.1f}" if rating is not None else "N/A"
-            desc = (c.get("description") or "")[:60]
-            print(f"{i}. {c['name']} ({rating_str}) — {desc}")
-    finally:
-        storage.close()
-
-
 def cmd_cocktail_search(args):
     """搜尋雞尾酒"""
     storage = _open_diffords(args.cocktail_db)
@@ -604,17 +584,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 範例：
-  python query.py list                          列出所有（前 20 筆）
-  python query.py list --type "Single Malt"     篩選類型
-  python query.py list --country Japan          篩選產地
-  python query.py list --min-score 90           90 分以上
-  python query.py search Hibiki                 搜尋關鍵字
-  python query.py top 10                        評分 Top 10
-  python query.py info "Highland Park"          查看完整資訊
-  python query.py stats                         資料庫統計
-  python query.py flavors                       風味維度總覽
-  python query.py flavors --name smoky          最煙燻的烈酒
-  python query.py export output.csv             匯出 CSV
+  python query.py spirits-list                          列出所有（前 20 筆）
+  python query.py spirits-list --type "Single Malt"     篩選類型
+  python query.py spirits-list --country Japan          篩選產地
+  python query.py spirits-list --min-score 90           90 分以上
+  python query.py spirits-search Hibiki                 搜尋關鍵字
+  python query.py spirits-top 10                        評分 Top 10
+  python query.py spirits-info "Highland Park"          查看完整資訊
+  python query.py spirits-stats                         資料庫統計
+  python query.py spirits-flavors                       風味維度總覽
+  python query.py spirits-flavors --name smoky          最煙燻的烈酒
+  python query.py spirits-export output.csv             匯出 CSV
         """,
     )
     parser.add_argument(
@@ -623,8 +603,8 @@ def main():
 
     sub = parser.add_subparsers(dest="command", help="查詢子命令")
 
-    # list
-    p_list = sub.add_parser("list", help="列出烈酒（支援篩選）")
+    # spirits-list
+    p_list = sub.add_parser("spirits-list", help="列出烈酒（支援篩選）")
     p_list.add_argument("--type", help="類型篩選（模糊匹配）")
     p_list.add_argument("--country", help="產地篩選（模糊匹配）")
     p_list.add_argument("--brand", help="品牌篩選（模糊匹配）")
@@ -636,42 +616,33 @@ def main():
     p_list.add_argument("--asc", action="store_true", help="升序排列")
     p_list.add_argument("--limit", type=int, default=20, help="顯示筆數（預設：20）")
 
-    # search
-    p_search = sub.add_parser("search", help="模糊搜尋品名、品牌、描述")
+    # spirits-search
+    p_search = sub.add_parser("spirits-search", help="模糊搜尋品名、品牌、描述")
     p_search.add_argument("keyword", help="搜尋關鍵字")
     p_search.add_argument("--limit", type=int, default=20, help="顯示筆數")
 
-    # top
-    p_top = sub.add_parser("top", help="評分最高的烈酒")
+    # spirits-top
+    p_top = sub.add_parser("spirits-top", help="評分最高的烈酒")
     p_top.add_argument(
         "n", nargs="?", type=int, default=10, help="顯示筆數（預設：10）"
     )
 
-    # info
-    p_info = sub.add_parser("info", help="查看單筆烈酒完整資訊")
+    # spirits-info
+    p_info = sub.add_parser("spirits-info", help="查看單筆烈酒完整資訊")
     p_info.add_argument("name", help="烈酒名稱（模糊匹配）")
 
-    # stats
-    sub.add_parser("stats", help="資料庫統計摘要")
+    # spirits-stats
+    sub.add_parser("spirits-stats", help="資料庫統計摘要")
 
-    # flavors
-    p_flavors = sub.add_parser("flavors", help="風味圖譜查詢")
+    # spirits-flavors
+    p_flavors = sub.add_parser("spirits-flavors", help="風味圖譜查詢")
     p_flavors.add_argument("--name", help="風味名稱（如 smoky, sweet, peaty）")
     p_flavors.add_argument("--min-value", type=int, default=0, help="最低風味值")
     p_flavors.add_argument("--limit", type=int, default=15, help="顯示筆數")
 
-    # export
-    p_export = sub.add_parser("export", help="匯出為 CSV")
+    # spirits-export
+    p_export = sub.add_parser("spirits-export", help="匯出為 CSV")
     p_export.add_argument("filename", help="輸出檔名")
-
-    # cocktail-top
-    p_ctop = sub.add_parser("cocktail-top", help="評分最高的雞尾酒")
-    p_ctop.add_argument("n", nargs="?", type=int, default=10, help="數量 (預設 10)")
-    p_ctop.add_argument(
-        "--cocktail-db",
-        default=COCKTAIL_DB_DEFAULT,
-        help=f"Difford's DB 路徑（預設：{COCKTAIL_DB_DEFAULT}）",
-    )
 
     # cocktail-search
     p_csearch = sub.add_parser("cocktail-search", help="搜尋雞尾酒")
@@ -727,14 +698,13 @@ def main():
         return
 
     commands = {
-        "list": cmd_list,
-        "search": cmd_search,
-        "top": cmd_top,
-        "info": cmd_info,
-        "stats": cmd_stats,
-        "flavors": cmd_flavors,
-        "export": cmd_export,
-        "cocktail-top": cmd_cocktail_top,
+        "spirits-list": cmd_list,
+        "spirits-search": cmd_search,
+        "spirits-top": cmd_top,
+        "spirits-info": cmd_info,
+        "spirits-stats": cmd_stats,
+        "spirits-flavors": cmd_flavors,
+        "spirits-export": cmd_export,
         "cocktail-search": cmd_cocktail_search,
         "cocktail-info": cmd_cocktail_info,
         "cocktail-stats": cmd_cocktail_stats,

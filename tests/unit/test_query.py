@@ -23,7 +23,6 @@ from query import (
     cmd_stats,
     cmd_top,
     cmd_flavors,
-    cmd_cocktail_top,
     cmd_cocktail_search,
     cmd_cocktail_info,
     cmd_cocktail_stats,
@@ -410,10 +409,6 @@ class TestCocktailArgparsing:
             parser = argparse.ArgumentParser()
             sub = parser.add_subparsers(dest="command")
 
-            p = sub.add_parser("cocktail-top")
-            p.add_argument("n", nargs="?", type=int, default=10)
-            p.add_argument("--cocktail-db", default="diffords.db")
-
             p2 = sub.add_parser("cocktail-search")
             p2.add_argument("keyword")
             p2.add_argument("--cocktail-db", default="diffords.db")
@@ -439,15 +434,6 @@ class TestCocktailArgparsing:
             return parser.parse_args(argv)
         finally:
             _sys.argv = old
-
-    def test_cocktail_top_default_n(self):
-        args = self._parse(["cocktail-top"])
-        assert args.command == "cocktail-top"
-        assert args.n == 10
-
-    def test_cocktail_top_custom_n(self):
-        args = self._parse(["cocktail-top", "5"])
-        assert args.n == 5
 
     def test_cocktail_search_keyword(self):
         args = self._parse(["cocktail-search", "negroni"])
@@ -625,29 +611,6 @@ class FakeCocktailArgs:
         self.cocktail_db = cocktail_db
         for k, v in kwargs.items():
             setattr(self, k, v)
-
-
-class TestCmdCocktailTop:
-    def test_top_default(self, diffords_db_path, capsys):
-        args = FakeCocktailArgs(diffords_db_path, n=10)
-        cmd_cocktail_top(args)
-        out = capsys.readouterr().out
-        assert "Top 10" in out
-        assert "Old Fashioned" in out
-
-    def test_top_limited(self, diffords_db_path, capsys):
-        args = FakeCocktailArgs(diffords_db_path, n=1)
-        cmd_cocktail_top(args)
-        out = capsys.readouterr().out
-        assert "Top 1" in out
-        assert "Old Fashioned" in out
-
-    def test_missing_db_exits(self, tmp_path, capsys):
-        args = FakeCocktailArgs(str(tmp_path / "nonexistent.db"), n=10)
-        with pytest.raises(SystemExit):
-            cmd_cocktail_top(args)
-        out = capsys.readouterr().out
-        assert "⚠️" in out
 
 
 class TestCmdCocktailSearch:

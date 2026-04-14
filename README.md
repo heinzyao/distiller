@@ -19,7 +19,7 @@ A Python web scraper project designed to extract liquor reviews and spirit profi
 - **Difford's Guide Scraper**: lightweight scraper (requests + BeautifulSoup, no Chrome) for cocktail recipes from diffordsguide.com — sitemap-driven incremental updates.
 - **Cocktail Query System**: Search, filter, and cross-query 6000+ cocktail recipes from Difford's Guide database — by ingredient, tag, rating, ABV, or spirit availability.
 - **`recipe` Bot Command**: query full cocktail recipes (ingredients, instructions, history, review) from the Difford's Guide database.
-- 468 automated tests with GitHub Actions CI/CD pipelines.
+- 505 automated tests with GitHub Actions CI/CD pipelines.
 
 ### Project Structure
 
@@ -122,7 +122,7 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-Supported Commands: `top`, `search`, `details`, `stats`, `flavors`, `list`, `recipe` / `酒譜`, `調酒`, `help`
+Supported Commands: `烈酒排行`, `烈酒搜尋`, `烈酒詳情`, `烈酒列表`, `烈酒統計`, `烈酒風味`, `雞尾酒酒譜`, `雞尾酒搜尋`, `雞尾酒詳情`, `雞尾酒統計`, `雞尾酒列表`, `雞尾酒推薦`, `說明`
 
 #### Difford's Guide Scraper
 
@@ -143,12 +143,12 @@ python run_diffords.py --mode test
 
 | Command | Description |
 |---------|-------------|
-| `調酒 排行` | Top-rated cocktails |
-| `調酒 搜尋 <keyword>` | Search by name |
-| `調酒 詳情 <name>` | Full recipe details |
-| `調酒 統計` | Database statistics |
-| `調酒 清單 材料\|標籤\|評分\|ABV <value>` | Filter query |
-| `調酒 推薦` | Recommend based on your spirits |
+| `雞尾酒酒譜 <name>` | Full recipe: ingredients, steps, history |
+| `雞尾酒搜尋 <keyword>` | Search cocktails by name |
+| `雞尾酒詳情 <name>` | Full recipe details with rating |
+| `雞尾酒統計` | Database statistics |
+| `雞尾酒列表 [--ingredient\|--tag\|--rating\|--abv <value>]` | Filter cocktails |
+| `雞尾酒推薦` | Recommend based on your spirits |
 
 ### Testing
 
@@ -273,7 +273,7 @@ MIT
 - **Difford's Guide 爬蟲**：輕量爬蟲（requests + BeautifulSoup，無需 Chrome），從 diffordsguide.com 爬取雞尾酒酒譜，Sitemap 驅動增量更新
 - **調酒查詢系統**：搜尋、篩選、交叉查詢 Difford's Guide 資料庫 6000+ 雞尾酒酒譜 — 依材料、標籤、評分、ABV 或可用烈酒
 - **`酒譜` Bot 指令**：查詢 Difford's Guide 資料庫的完整酒譜（食材、作法、歷史、評語）
-- 468 個自動化測試，GitHub Actions CI/CD
+- 505 個自動化測試，GitHub Actions CI/CD
 
 ### 專案結構
 
@@ -376,7 +376,7 @@ uv run python bot.py
 curl http://localhost:8000/health
 ```
 
-支援指令：`top`、`搜尋`、`詳情`、`統計`、`風味`、`列表`、`酒譜`、`調酒`、`說明`
+支援指令：`烈酒排行`、`烈酒搜尋`、`烈酒詳情`、`烈酒列表`、`烈酒統計`、`烈酒風味`、`雞尾酒酒譜`、`雞尾酒搜尋`、`雞尾酒詳情`、`雞尾酒統計`、`雞尾酒列表`、`雞尾酒推薦`、`說明`
 
 #### Difford's Guide 爬蟲
 
@@ -397,12 +397,12 @@ python run_diffords.py --mode test
 
 | 指令 | 說明 |
 |------|------|
-| `調酒 排行` | 評分排行榜 |
-| `調酒 搜尋 <關鍵字>` | 名稱模糊搜尋 |
-| `調酒 詳情 <名稱>` | 完整酒譜詳情 |
-| `調酒 統計` | 資料庫統計概覽 |
-| `調酒 清單 材料\|標籤\|評分\|ABV <值>` | 篩選查詢 |
-| `調酒 推薦` | 根據已有烈酒推薦可調酒 |
+| `雞尾酒酒譜 <酒名>` | 完整酒譜：食材、作法、歷史 |
+| `雞尾酒搜尋 <關鍵字>` | 名稱模糊搜尋 |
+| `雞尾酒詳情 <名稱>` | 完整酒譜詳情與評分 |
+| `雞尾酒統計` | 資料庫統計概覽 |
+| `雞尾酒列表 [--ingredient\|--tag\|--rating\|--abv <值>]` | 篩選查詢 |
+| `雞尾酒推薦` | 根據已有烈酒推薦可調製項目 |
 
 ### 測試
 

@@ -206,18 +206,36 @@ class TestParseCommand:
     def test_help_question(self):
         assert parse_command("?") == ("help", [])
 
+    def test_spirits_stats(self):
+        assert parse_command("烈酒統計") == ("stats", [])
+
     def test_stats_zh(self):
         assert parse_command("統計") == ("stats", [])
 
     def test_stats_en(self):
         assert parse_command("stats") == ("stats", [])
 
+    def test_spirits_flavors_all(self):
+        assert parse_command("烈酒風味") == ("flavors", [])
+
     def test_flavors_all(self):
         assert parse_command("風味") == ("flavors", [])
+
+    def test_spirits_flavors_name(self):
+        cmd, args = parse_command("烈酒風味 smoky")
+        assert cmd == "flavors" and args == ["smoky"]
 
     def test_flavors_name(self):
         cmd, args = parse_command("風味 smoky")
         assert cmd == "flavors" and args == ["smoky"]
+
+    def test_spirits_top_default(self):
+        cmd, args = parse_command("烈酒排行")
+        assert cmd == "top" and args == [10]
+
+    def test_spirits_top_n(self):
+        cmd, args = parse_command("烈酒排行 5")
+        assert cmd == "top" and args == [5]
 
     def test_top_default(self):
         cmd, args = parse_command("top")
@@ -231,13 +249,29 @@ class TestParseCommand:
         _, args = parse_command("top 99")
         assert args[0] == 20
 
+    def test_spirits_search(self):
+        cmd, args = parse_command("烈酒搜尋 Lagavulin")
+        assert cmd == "search" and args == ["Lagavulin"]
+
     def test_search_zh(self):
         cmd, args = parse_command("搜尋 Lagavulin")
         assert cmd == "search" and args == ["Lagavulin"]
 
+    def test_spirits_info(self):
+        cmd, args = parse_command("烈酒詳情 Highland Park")
+        assert cmd == "info" and args == ["Highland Park"]
+
     def test_info_zh(self):
         cmd, args = parse_command("詳情 Highland Park")
         assert cmd == "info" and args == ["Highland Park"]
+
+    def test_spirits_list_plain(self):
+        cmd, args = parse_command("烈酒列表")
+        assert cmd == "list" and args == [None, None]
+
+    def test_spirits_list_country(self):
+        cmd, args = parse_command("烈酒列表 Japan")
+        assert cmd == "list" and args[0] == "Japan"
 
     def test_list_plain(self):
         cmd, args = parse_command("列表")
@@ -348,12 +382,12 @@ class TestFmtList:
 class TestFmtHelp:
     def test_contains_commands(self):
         result = fmt_help()
-        for cmd in ("top", "搜尋", "詳情", "統計", "風味", "列表"):
+        for cmd in ("烈酒排行", "烈酒搜尋", "烈酒詳情", "烈酒統計", "烈酒風味", "烈酒列表"):
             assert cmd in result
 
     def test_contains_run_commands(self):
         result = fmt_help()
-        assert "執行" in result
+        assert "執行狀態" in result
 
 
 # ---------------------------------------------------------------------------
@@ -732,6 +766,11 @@ def diffords_db(tmp_path):
 
 
 class TestParseCommandRecipe:
+    def test_recipe_new_prefix(self):
+        cmd, args = parse_command("雞尾酒酒譜 Negroni")
+        assert cmd == "recipe"
+        assert args[0] == "Negroni"
+
     def test_recipe_chinese(self):
         cmd, args = parse_command("酒譜 Negroni")
         assert cmd == "recipe"
@@ -806,23 +845,22 @@ class TestHandleRecipe:
 
 
 class TestFmtHelpCocktailSection:
-    """Test fmt_help() contains 🍸 調酒查詢 section with cocktail commands."""
+    """Test fmt_help() contains 🍸 雞尾酒查詢 section with cocktail commands."""
 
     def test_fmt_help_contains_cocktail_section_header(self):
-        """fmt_help() should include '🍸 調酒查詢' header."""
+        """fmt_help() should include '🍸 雞尾酒查詢' header."""
         result = fmt_help()
-        assert "🍸 調酒查詢" in result
+        assert "🍸 雞尾酒查詢" in result
 
     def test_fmt_help_contains_specific_cocktail_commands(self):
-        """fmt_help() should list all 6 cocktail commands."""
+        """fmt_help() should list all cocktail commands."""
         result = fmt_help()
         expected_commands = [
-            "調酒排行",
-            "調酒搜尋",
-            "調酒詳情",
-            "調酒統計",
-            "調酒列表",
-            "我能做什麼",
+            "雞尾酒搜尋",
+            "雞尾酒詳情",
+            "雞尾酒統計",
+            "雞尾酒列表",
+            "雞尾酒推薦",
         ]
         for cmd in expected_commands:
             assert cmd in result
@@ -830,14 +868,6 @@ class TestFmtHelpCocktailSection:
 
 class TestFmtCocktailEmptyDb:
     """Test fmt_cocktail_* functions return _DIFFORDS_DB_MISSING when DB missing."""
-
-    def test_fmt_cocktail_top_returns_missing_db_message(self, tmp_path):
-        """fmt_cocktail_top() returns _DIFFORDS_DB_MISSING when DB doesn't exist."""
-        from bot import fmt_cocktail_top, _DIFFORDS_DB_MISSING
-
-        missing_db_path = str(tmp_path / "nonexistent_diffords.db")
-        result = fmt_cocktail_top(missing_db_path, n=10)
-        assert result == _DIFFORDS_DB_MISSING
 
     def test_fmt_cocktail_search_returns_missing_db_message(self, tmp_path):
         """fmt_cocktail_search() returns _DIFFORDS_DB_MISSING when DB doesn't exist."""
