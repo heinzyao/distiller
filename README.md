@@ -229,16 +229,17 @@ The SQLite schema involves:
 
 #### Scheduling and Deduplication Pipeline
 
-`launchd` scheduling handles automated daily scrapes sequentially passing through 7 categories every night at 3:00 AM (`--mode full --output both --use-api`).
-To ensure idempotence and prevent overlapping data, a 5-layer deduplication logic is applied:
+`launchd` scheduling handles automated weekly scrapes (every Monday at 10:00 AM) passing through 7 categories (`--mode full --output both --use-api`). Cloud Run also provides an independent daily schedule via Cloud Scheduler.
+To ensure idempotence and prevent overlapping data, a 6-layer deduplication logic is applied:
 
 | Layer | Mechanism | Description |
 |-------|-----------|-------------|
 | 1 | `seen_urls` preloading | Upon boot, all collected URLs form an in-memory Set from SQLite |
 | 2 | Item-level bypass | Before firing HTTP requests, verifies URL existence against `seen_urls` |
-| 3 | Category-level bypass| If a whole page comprises 100% existing DB items, jumps to the next category |
-| 4 | Duplication density | Evaluated from page 2. Paginating stops if the duplicate hitrate reaches ≥ 80% |
-| 5 | SQLite Upsert | Uses `UNIQUE` URL constraints; writes invoke an `ON CONFLICT` update |
+| 3 | First-page early stop | Page 1 duplicate rate ≥ 95% → skip entire category immediately (no further pages loaded) |
+| 4 | Duplication density | From page 2, paginating stops if the duplicate hitrate reaches ≥ 80% |
+| 5 | Consecutive duplicate pages | After 3 consecutive all-duplicate pages, stops pagination |
+| 6 | SQLite Upsert | Uses `UNIQUE` URL constraints; writes invoke an `ON CONFLICT` update |
 
 > **Note**: CSV output is handled inside an isolated scope and is distinct across runs inside the `data/` folder (only deduplicated intra-scrape). `SQLite` acts as the persistent global deduplication source constraint.
 
@@ -483,16 +484,17 @@ SQLite schema 包含：
 
 #### 排程與去重機制
 
-每日凌晨 3:00 由 launchd 排程執行完整爬取（`--mode full --output both --use-api`）。
-系統透過五層去重機制確保不會重複爬取已有資料：
+本地 launchd 排程每週一上午 10:00 執行完整爬取（`--mode full --output both --use-api`）；Cloud Run 另有獨立的 Cloud Scheduler 每日排程。
+系統透過六層去重機制確保不會重複爬取已有資料：
 
 | 層級 | 機制 | 說明 |
 |------|------|------|
 | 1 | `seen_urls` 預載 | 啟動時從 SQLite 載入所有已存 URL 至記憶體 |
 | 2 | 逐筆跳過 | 爬取詳情前檢查 `seen_urls`，已存在則跳過（不發 HTTP 請求）|
-| 3 | 整類跳過 | 若某頁所有 URL 皆已在 DB 中，整個類別直接跳過 |
+| 3 | 首頁早停 | 第 1 頁重複率 ≥ 95% 時直接跳過整個類別（不再載入後續頁面）|
 | 4 | 重複率閾值 | 第 2 頁起重複率 ≥ 80% 時自動停止分頁 |
-| 5 | SQLite upsert | URL 為 `UNIQUE` 欄位，重複寫入時更新而非新增 |
+| 5 | 連續重複頁 | 連續 3 頁全為重複 URL 時停止分頁 |
+| 6 | SQLite upsert | URL 為 `UNIQUE` 欄位，重複寫入時更新而非新增 |
 
 > **注意**：CSV 輸出為每次執行獨立檔案，儲存於 `data/` 目錄，僅在單次執行內去重。SQLite 為跨執行的唯一去重來源。
 

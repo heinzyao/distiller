@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Distiller Scraper Scheduled Task
-# Runs daily at 3:00 AM using launchd
+# Runs weekly on Monday at 10:00 AM using launchd
 # Configuration: com.distiller.scraper.plist
 
 set -eo pipefail

@@ -555,6 +555,14 @@ class DistillerScraperV2:
                     f"新增 {len(new_urls)} 個（重複率 {duplicate_ratio:.0%}）"
                 )
 
+                # ── 第一頁早停：重複率過高代表本類別資料已是最新，無需繼續分頁 ──
+                if page == 1 and duplicate_ratio >= ScraperConfig.SKIP_CATEGORY_THRESHOLD:
+                    logger.info(
+                        f"  首頁重複率 {duplicate_ratio:.0%} >= {ScraperConfig.SKIP_CATEGORY_THRESHOLD:.0%}，"
+                        f"跳過 {label}（資料已是最新）"
+                    )
+                    break
+
                 # ── 分頁有效性判斷（僅在第 2 頁） ──
                 if page == 2:
                     if current_page_set != prev_page_urls:

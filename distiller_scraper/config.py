@@ -145,7 +145,8 @@ class ScraperConfig:
         "Cannot read properties of null",  # JS null body (document.body 為 null)
         "null is not an object",  # Safari 風格 JS null 錯誤（防禦性）
     ]
-    DUPLICATE_RUN_WINDOW_HOURS = 20  # 重複執行檢測窗口（小時），窗口內有成功執行則跳過
+    DUPLICATE_RUN_WINDOW_HOURS = 168  # 重複執行檢測窗口（小時），窗口內有成功執行則跳過（7 天 = 週排程）
+    SKIP_CATEGORY_THRESHOLD = 0.95  # 首頁重複率超過此值時直接跳過整個類別查詢（節省後續分頁載入）
 
     # User-Agent
     USER_AGENT = (
