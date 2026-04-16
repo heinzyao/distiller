@@ -20,7 +20,6 @@ from distiller_scraper.diffords_config import (
     DIFFORDS_DB_DEFAULT,
     DIFFORDS_DB_PATH,
     DIFFORDS_NOTIFY_SOURCE,
-    DUPLICATE_RUN_WINDOW_HOURS,
     GCS_DIFFORDS_DB_BLOB,
     SITEMAP_URL,
     _HEADERS,
@@ -375,17 +374,6 @@ class TestDiffordsStorage:
         last = storage.get_last_successful_run()
         assert last is not None
 
-    def test_should_skip_run_no_history(self, storage):
-        skip, _ = storage.should_skip_run()
-        assert not skip
-
-    def test_should_skip_run_recent(self, storage):
-        run_id = storage.record_scrape_run("incremental")
-        storage.finish_scrape_run(run_id, 10, 0, 0, "completed")
-        skip, last = storage.should_skip_run(window_hours=168)
-        assert skip
-        assert last != ""
-
     def test_get_stats(self, storage):
         storage.save_cocktail(SAMPLE_COCKTAIL)
         stats = storage.get_stats()
@@ -624,7 +612,6 @@ class TestDiffordsConfig:
         assert SITEMAP_URL == "https://www.diffordsguide.com/sitemap/cocktail.xml"
         assert DIFFORDS_DB_DEFAULT == "diffords.db"
         assert DIFFORDS_DB_PATH == "diffords.db"
-        assert DUPLICATE_RUN_WINDOW_HOURS == 168
         assert DIFFORDS_NOTIFY_SOURCE == "Difford's Guide"
 
     def test_headers_structure(self):
@@ -645,7 +632,6 @@ class TestDiffordsConfig:
         assert isinstance(DEFAULT_DELAY_MAX, float)
         assert isinstance(SITEMAP_URL, str)
         assert isinstance(DIFFORDS_DB_DEFAULT, str)
-        assert isinstance(DUPLICATE_RUN_WINDOW_HOURS, int)
         assert isinstance(DIFFORDS_NOTIFY_SOURCE, str)
 
 

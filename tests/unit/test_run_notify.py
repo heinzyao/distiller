@@ -1,11 +1,9 @@
 """
 run.py LINE 通知整合單元測試
 
-涵蓋 main() 在 --notify-line 旗標下的四種情境：
-  1. 跳過（_skipped=True）→ notify_success 以空 stats 呼叫
-  2. 爬取成功           → notify_success 呼叫
-  3. 爬取失敗（例外）   → notify_failure 呼叫
-  4. 健康檢查失敗       → notify_failure 呼叫
+涵蓋 main() 在 --notify-line 旗標下的情境：
+  1. 爬取成功   → notify_success 呼叫
+  2. 爬取失敗   → notify_failure 呼叫
 以及旗標缺席、LINE 未設定、發送失敗重試等情境。
 """
 
@@ -29,11 +27,9 @@ def _make_notifier_mock(is_configured=True, send_results=None):
     if send_results is None:
         send_results = [True]
 
-    # notify_success / notify_failure / notify_skipped 底層都呼叫 send()；
     # 這裡直接設定高階方法的回傳值序列。
     mock.notify_success.side_effect = send_results
     mock.notify_failure.side_effect = send_results
-    mock.notify_skipped.side_effect = send_results
     return mock
 
 
@@ -78,59 +74,6 @@ def _run_main(monkeypatch, extra_argv=None, run_fn_return=None):
 
 class TestMainNotify:
     """main() 在 --notify-line 下的各情境測試。"""
-
-    def test_skip_scenario_calls_notify_skipped(self, monkeypatch, capsys):
-        """跳過情境：_skipped=True，應呼叫 notify_skipped，不應呼叫 notify_success。"""
-        mock_notifier = _make_notifier_mock(is_configured=True, send_results=[True])
-
-        import run as run_module
-
-        monkeypatch.setattr(
-            "sys.argv", ["run.py", "--mode", "test", "--output", "csv", "--notify-line"]
-        )
-
-        with (
-            patch.object(
-                run_module,
-                "run_test",
-                return_value=(
-                    True,
-                    {"_skipped": True, "_last_run_at": "2026-03-16T03:00:00"},
-                ),
-            ),
-            patch.object(run_module, "LineNotifier", return_value=mock_notifier),
-            patch.object(run_module.time, "sleep"),
-        ):
-            run_module.main()
-
-        mock_notifier.notify_skipped.assert_called_once()
-        mock_notifier.notify_success.assert_not_called()
-        call_args = mock_notifier.notify_skipped.call_args
-        assert call_args[0][0] == "test"
-
-    def test_skip_scenario_label_contains_skip_text(self, monkeypatch, capsys):
-        """跳過情境成功發送後，印出文字應包含「跳過」字樣。"""
-        mock_notifier = _make_notifier_mock(is_configured=True, send_results=[True])
-
-        import run as run_module
-
-        monkeypatch.setattr(
-            "sys.argv", ["run.py", "--mode", "test", "--output", "csv", "--notify-line"]
-        )
-
-        with (
-            patch.object(
-                run_module,
-                "run_test",
-                return_value=(True, {"_skipped": True, "_last_run_at": ""}),
-            ),
-            patch.object(run_module, "LineNotifier", return_value=mock_notifier),
-            patch.object(run_module.time, "sleep"),
-        ):
-            run_module.main()
-
-        out = capsys.readouterr().out
-        assert "跳過" in out
 
     def test_scrape_success_calls_notify_success(self, monkeypatch, capsys):
         """正常爬取成功：應呼叫 notify_success。"""
@@ -339,23 +282,3 @@ class TestMainNotify:
         # sys.exit 不應被呼叫（成功不呼叫 sys.exit）
         assert exit_called == []
 
-    def test_skipped_stats_filtered_before_notify(self, monkeypatch):
-        """stats 含有其他真實欄位時，_skipped 路徑呼叫 notify_skipped，not notify_success。"""
-        mock_notifier = _make_notifier_mock(is_configured=True, send_results=[True])
-        stats = {"總記錄數": 10, "_skipped": True, "_last_run_at": ""}
-
-        import run as run_module
-
-        monkeypatch.setattr(
-            "sys.argv", ["run.py", "--mode", "test", "--output", "csv", "--notify-line"]
-        )
-
-        with (
-            patch.object(run_module, "run_test", return_value=(True, stats)),
-            patch.object(run_module, "LineNotifier", return_value=mock_notifier),
-            patch.object(run_module.time, "sleep"),
-        ):
-            run_module.main()
-
-        mock_notifier.notify_skipped.assert_called_once()
-        mock_notifier.notify_success.assert_not_called()

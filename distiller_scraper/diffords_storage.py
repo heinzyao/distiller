@@ -323,19 +323,6 @@ class DiffordsStorage:
         """).fetchone()
         return row[0] if row else None
 
-    def should_skip_run(self, window_hours: int = 168) -> tuple[bool, str]:
-        """若 window_hours 內已有成功紀錄，回傳 (True, last_run_at)；否則 (False, '')。"""
-        last = self.get_last_successful_run()
-        if not last:
-            return False, ""
-        try:
-            last_dt = datetime.fromisoformat(last)
-        except ValueError:
-            return False, ""
-        if datetime.now() - last_dt < timedelta(hours=window_hours):
-            return True, last
-        return False, ""
-
     # ------------------------------------------------------------------
     # 查詢（供 bot.py 使用）
     # ------------------------------------------------------------------

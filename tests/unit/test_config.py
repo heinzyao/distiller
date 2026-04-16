@@ -194,6 +194,3 @@ class TestScraperConfigFailureHandling:
         # 新增的 JS null 錯誤觸發條件
         assert any("Cannot read properties of null" in t for t in triggers)
 
-    def test_duplicate_run_window_hours_exists_and_default(self):
-        """確認 DUPLICATE_RUN_WINDOW_HOURS 存在且預設為 20"""
-        assert ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS == 20

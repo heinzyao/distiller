@@ -14,8 +14,6 @@ import logging
 import os
 from datetime import datetime
 
-from distiller_scraper.config import ScraperConfig
-
 import requests
 
 logger = logging.getLogger(__name__)
@@ -193,20 +191,3 @@ class LineNotifier:
             lines.append(error_details)
         return self.send("\n".join(lines))
 
-    def notify_skipped(self, mode: str, last_run_at: str = "", source: str = "Distiller") -> bool:
-        lines: list[str] = [
-            f"⏭️ 【{source} 更新任務跳過】",
-            _SEP,
-            f"📅 時間：{self._timestamp()}",
-            f"⚙️ 模式：{mode.upper()}",
-            "",
-            "💡 跳過原因",
-            f"  系統於 {ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS} 小時內已有成功紀錄",
-        ]
-        if last_run_at:
-            try:
-                ts = datetime.fromisoformat(last_run_at).strftime("%Y-%m-%d %H:%M")
-            except (ValueError, TypeError):
-                ts = last_run_at
-            lines.append(f"  上次執行：{ts}")
-        return self.send("\n".join(lines))

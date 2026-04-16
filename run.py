@@ -11,7 +11,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 # 加入專案路徑
@@ -29,27 +29,6 @@ from distiller_scraper.storage import CSVStorage, SQLiteStorage
 
 logger = logging.getLogger(__name__)
 
-
-def _should_skip_run(storage) -> tuple[bool, str]:
-    if not isinstance(storage, SQLiteStorage):
-        return False, ""
-    try:
-        cutoff = datetime.now() - timedelta(
-            hours=ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS
-        )
-        row = storage.conn.execute(
-            "SELECT started_at FROM scrape_runs"
-            " WHERE status IN ('completed', 'completed_with_errors')"
-            " AND started_at >= ? ORDER BY started_at DESC LIMIT 1",
-            (cutoff.isoformat(),),
-        ).fetchone()
-        if row:
-            logger.info(f"Recent successful run found at {row[0]}, skipping")
-            return True, str(row[0])
-        return False, ""
-    except Exception as e:
-        logger.warning(f"Duplicate check failed, proceeding: {e}")
-        return False, ""  # fail-open
 
 
 def _use_pagination(args) -> bool:
@@ -87,10 +66,6 @@ def run_test(output: str = "csv", db_path: str = "distiller.db", args=None):
     storage, csv_file = _build_storage(
         output, db_path, str(DATA_DIR / "distiller_test_v2.csv")
     )
-    skip, last_run_at = _should_skip_run(storage)
-    if skip:
-        print("⏭️  Recent successful run found, skipping")
-        return True, {"_skipped": True, "_last_run_at": last_run_at}
     scraper = DistillerScraperV2(
         headless=True, storage=storage, api_client=_build_api_client(args)
     )
@@ -141,10 +116,6 @@ def run_medium(output: str = "csv", db_path: str = "distiller.db", args=None):
     storage, csv_file = _build_storage(
         output, db_path, str(DATA_DIR / f"distiller_spirits_{timestamp}.csv")
     )
-    skip, last_run_at = _should_skip_run(storage)
-    if skip:
-        print("⏭️  Recent successful run found, skipping")
-        return True, {"_skipped": True, "_last_run_at": last_run_at}
     scraper = DistillerScraperV2(
         headless=True, storage=storage, api_client=_build_api_client(args)
     )
@@ -195,10 +166,6 @@ def run_full(output: str = "csv", db_path: str = "distiller.db", args=None):
     storage, csv_file = _build_storage(
         output, db_path, str(DATA_DIR / f"distiller_spirits_full_{timestamp}.csv")
     )
-    skip, last_run_at = _should_skip_run(storage)
-    if skip:
-        print("⏭️  Recent successful run found, skipping")
-        return True, {"_skipped": True, "_last_run_at": last_run_at}
     scraper = DistillerScraperV2(
         headless=True, storage=storage, api_client=_build_api_client(args)
     )
@@ -314,23 +281,16 @@ def main():
 
     # LINE 通知（失敗時自動等待 30 秒重試一次，處理 3AM 暫時性 DNS 問題）
     if args.notify_line:
-        skipped = stats.get("_skipped", False)
         notifier = LineNotifier()
         if not notifier.is_configured():
             print(
                 "⚠️  LINE 通知未設定（缺少 LINE_CHANNEL_ID、LINE_CHANNEL_SECRET 或 LINE_USER_ID）"
             )
         else:
-            clean_stats = {k: v for k, v in stats.items() if not k.startswith("_")}
-
             def _do_notify() -> bool:
-                if skipped:
-                    return notifier.notify_skipped(
-                        args.mode, stats.get("_last_run_at", "")
-                    )
                 if success:
                     return notifier.notify_success(
-                        args.mode, clean_stats, duration_secs=duration_secs
+                        args.mode, stats, duration_secs=duration_secs
                     )
                 return notifier.notify_failure(
                     args.mode,
@@ -343,12 +303,7 @@ def main():
                 print("⚠️  LINE 通知第一次失敗，30 秒後重試…")
                 time.sleep(30)
                 ok = _do_notify()
-            if skipped:
-                label = "LINE 跳過通知已發送"
-            elif success:
-                label = "LINE 通知已發送"
-            else:
-                label = "LINE 失敗通知已發送"
+            label = "LINE 通知已發送" if success else "LINE 失敗通知已發送"
             print(f"📱 {label}" if ok else "⚠️  LINE 通知發送失敗（請查看日誌）")
 
     # GCS 上傳：爬取完成後將更新的 DB 上傳（僅 sqlite/both 輸出模式且設定了 GCS_BUCKET）

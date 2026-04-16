@@ -27,10 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from distiller_scraper.diffords_config import (
-    DUPLICATE_RUN_WINDOW_HOURS,
-    DIFFORDS_NOTIFY_SOURCE,
-)
+from distiller_scraper.diffords_config import DIFFORDS_NOTIFY_SOURCE
 from distiller_scraper.diffords_scraper import DiffordsGuideScraper
 from distiller_scraper.diffords_storage import DiffordsStorage
 from distiller_scraper.notify import LineNotifier
@@ -49,15 +46,11 @@ logger = logging.getLogger(__name__)
 def _do_notify(
     notifier: LineNotifier,
     success: bool,
-    skipped: bool,
     mode: str,
     stats: dict,
     exc,
     duration_secs: int,
-    last_run_at: str = "",
 ) -> bool:
-    if skipped:
-        return notifier.notify_skipped(mode, last_run_at, source=DIFFORDS_NOTIFY_SOURCE)
     if success:
         clean_stats = {k: v for k, v in stats.items() if not k.startswith("_")}
         return notifier.notify_success(
@@ -80,17 +73,6 @@ def run(mode: str, db_path: str, notify_line: bool, args) -> tuple[bool, dict]:
     max_recipes = 10 if mode == "test" else None
 
     storage = DiffordsStorage(db_path)
-
-    # 執行視窗保護（test 模式不跳過）
-    if mode != "test":
-        should_skip, last_run_at = storage.should_skip_run(DUPLICATE_RUN_WINDOW_HOURS)
-        if should_skip:
-            logger.info(
-                "⏭️  %d 小時內已有成功執行紀錄，跳過", DUPLICATE_RUN_WINDOW_HOURS
-            )
-            storage.close()
-            return True, {"_skipped": True, "_last_run_at": last_run_at}
-
     run_id = storage.record_scrape_run(mode)
     scraper = DiffordsGuideScraper(storage=storage)
     status = "completed"
@@ -179,22 +161,18 @@ def main():
 
     # ── LINE 通知 ─────────────────────────────────────────────────────
     if args.notify_line:
-        skipped = stats.get("_skipped", False)
         notifier = LineNotifier()
         if not notifier.is_configured():
             print("⚠️  LINE 通知未設定（缺少憑證環境變數）")
         else:
-
             def _notify():
                 return _do_notify(
                     notifier,
                     success,
-                    skipped,
                     args.mode,
                     stats,
                     _exc,
                     duration_secs,
-                    stats.get("_last_run_at", ""),
                 )
 
             ok = _notify()
@@ -202,7 +180,7 @@ def main():
                 print("⚠️  LINE 通知第一次失敗，30 秒後重試…")
                 time.sleep(30)
                 ok = _notify()
-            label = "跳過通知" if skipped else ("成功通知" if success else "失敗通知")
+            label = "成功通知" if success else "失敗通知"
             print(f"📱 LINE {label}{'已發送' if ok else '發送失敗'}")
 
     # ── 結果 ─────────────────────────────────────────────────────────
@@ -211,8 +189,8 @@ def main():
 
     if success:
         scraped = stats.get("爬取新增", 0)
-        skipped = stats.get("跳過（已是最新）", 0)
-        print(f"\n✅ 執行成功！新增 {scraped} 筆，跳過 {skipped} 筆（已是最新）")
+        skipped_count = stats.get("跳過（已是最新）", 0)
+        print(f"\n✅ 執行成功！新增 {scraped} 筆，跳過 {skipped_count} 筆（已是最新）")
     else:
         print("\n❌ 執行失敗")
         sys.exit(1)

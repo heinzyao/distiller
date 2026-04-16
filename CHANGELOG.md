@@ -2,6 +2,28 @@
 
 本檔案記錄專案的所有重要變更。
 
+## [2.16.0] - 2026-04-16
+
+### 移除
+- **168 小時執行窗口保護**（`run.py`、`run_diffords.py`、`config.py`、`diffords_config.py`）
+  - 刪除 `ScraperConfig.DUPLICATE_RUN_WINDOW_HOURS` 與 `DUPLICATE_RUN_WINDOW_HOURS`（diffords）
+  - 刪除 `_should_skip_run()` 函式（`run.py`）及 Difford's 對應的 `storage.should_skip_run()` 呼叫
+  - 刪除 `DiffordsStorage.should_skip_run()` 方法
+  - 刪除 `LineNotifier.notify_skipped()` 方法
+  - 執行間隔完全由排程工具（launchd / Cloud Scheduler）控制，程式不再自行判斷是否跳過
+
+### 文件
+- 更新 `README.md`：排程說明改為「執行間隔由排程器控制，程式不設時間窗口」
+- 更新測試數量：505 → 488
+
+### 測試
+- 刪除 `test_duplicate_detection.py`（整個檔案，6 個測試）
+- 移除 `test_notify.py` 中的 `TestNotifySkipped` 類別（5 個測試）
+- 移除 `test_config.py` 中的 `test_duplicate_run_window_hours_exists_and_default`（1 個測試）
+- 移除 `test_diffords.py` 中的 `test_should_skip_run_*` 測試與 `DUPLICATE_RUN_WINDOW_HOURS` 斷言（2 個測試）
+- 移除 `test_run_notify.py` 中的 skip 情境測試（3 個測試）
+- 總測試數：488（較前版 −17）
+
 ## [2.15.0] - 2026-04-15
 
 ### 變更

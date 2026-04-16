@@ -19,7 +19,7 @@ A Python web scraper project designed to extract liquor reviews and spirit profi
 - **Difford's Guide Scraper**: lightweight scraper (requests + BeautifulSoup, no Chrome) for cocktail recipes from diffordsguide.com — sitemap-driven incremental updates.
 - **Cocktail Query System**: Search, filter, and cross-query 6000+ cocktail recipes from Difford's Guide database — by ingredient, tag, rating, ABV, or spirit availability.
 - **`recipe` Bot Command**: query full cocktail recipes (ingredients, instructions, history, review) from the Difford's Guide database.
-- 505 automated tests with GitHub Actions CI/CD pipelines.
+- 488 automated tests with GitHub Actions CI/CD pipelines.
 
 ### Project Structure
 
@@ -229,7 +229,7 @@ The SQLite schema involves:
 
 #### Scheduling and Deduplication Pipeline
 
-`launchd` scheduling handles automated weekly scrapes (every Monday at 10:00 AM) passing through 7 categories (`--mode full --output both --use-api`). Cloud Run also provides an independent daily schedule via Cloud Scheduler.
+`launchd` scheduling handles automated weekly scrapes (every Monday at 10:00 AM) passing through 7 categories (`--mode full --output both --use-api`). Cloud Run also provides an independent schedule for each scraper (Distiller and Difford's Guide) via Cloud Scheduler — run intervals are controlled exclusively by the scheduler, with no in-process time-window guard.
 To ensure idempotence and prevent overlapping data, a 6-layer deduplication logic is applied:
 
 | Layer | Mechanism | Description |
@@ -274,7 +274,7 @@ MIT
 - **Difford's Guide 爬蟲**：輕量爬蟲（requests + BeautifulSoup，無需 Chrome），從 diffordsguide.com 爬取雞尾酒酒譜，Sitemap 驅動增量更新
 - **調酒查詢系統**：搜尋、篩選、交叉查詢 Difford's Guide 資料庫 6000+ 雞尾酒酒譜 — 依材料、標籤、評分、ABV 或可用烈酒
 - **`酒譜` Bot 指令**：查詢 Difford's Guide 資料庫的完整酒譜（食材、作法、歷史、評語）
-- 505 個自動化測試，GitHub Actions CI/CD
+- 488 個自動化測試，GitHub Actions CI/CD
 
 ### 專案結構
 
@@ -484,7 +484,7 @@ SQLite schema 包含：
 
 #### 排程與去重機制
 
-本地 launchd 排程每週一上午 10:00 執行完整爬取（`--mode full --output both --use-api`）；Cloud Run 另有獨立的 Cloud Scheduler 每日排程。
+本地 launchd 排程每週一上午 10:00 執行完整爬取（`--mode full --output both --use-api`）；Cloud Run 的 Distiller 爬蟲與 Difford's Guide 爬蟲各有獨立的 Cloud Scheduler 排程，執行間隔完全由排程器控制，程式本身不設時間窗口限制。
 系統透過六層去重機制確保不會重複爬取已有資料：
 
 | 層級 | 機制 | 說明 |

@@ -338,37 +338,3 @@ class TestNotifyFailure:
         assert "⏱" not in msg
 
 
-# ---------------------------------------------------------------------------
-# notify_skipped()
-# ---------------------------------------------------------------------------
-
-
-class TestNotifySkipped:
-    def test_skipped_message_header(self, notifier):
-        with patch.object(notifier, "send", return_value=True) as mock_send:
-            notifier.notify_skipped("full")
-        msg = mock_send.call_args[0][0]
-        assert "⏭️" in msg
-
-    def test_skipped_shows_mode(self, notifier):
-        with patch.object(notifier, "send", return_value=True) as mock_send:
-            notifier.notify_skipped("medium")
-        msg = mock_send.call_args[0][0]
-        assert "MEDIUM" in msg
-
-    def test_skipped_shows_last_run_at(self, notifier):
-        with patch.object(notifier, "send", return_value=True) as mock_send:
-            notifier.notify_skipped("full", last_run_at="2026-03-16T15:45:30")
-        msg = mock_send.call_args[0][0]
-        assert "2026-03-16 15:45" in msg
-
-    def test_skipped_omits_last_run_at_when_empty(self, notifier):
-        with patch.object(notifier, "send", return_value=True) as mock_send:
-            notifier.notify_skipped("full", last_run_at="")
-        msg = mock_send.call_args[0][0]
-        assert "上次執行" not in msg
-
-    def test_skipped_returns_send_result(self, notifier):
-        with patch.object(notifier, "send", return_value=False):
-            result = notifier.notify_skipped("full")
-        assert result is False

@@ -34,10 +34,6 @@ _HEADERS = {
 DIFFORDS_DB_DEFAULT = "diffords.db"
 DIFFORDS_DB_PATH = "diffords.db"
 
-# ── 重複執行保護 ──
-# Difford's Guide 酒譜更新頻率遠低於烈酒資料，故採用 7 天（168 小時）視窗
-DUPLICATE_RUN_WINDOW_HOURS = 168
-
 # ── 通知設定 ──
 DIFFORDS_NOTIFY_SOURCE = "Difford's Guide"
 
