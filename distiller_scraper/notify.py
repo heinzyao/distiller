@@ -1,13 +1,14 @@
 """
-LINE Messaging API 通知模組
+LINE 推播通知模組 (LINE Messaging API Notifier)
 
-使用 LINE Messaging API 的 Push Message 端點發送通知。
-透過 Channel ID + Secret 動態取得短期 Access Token（與 music-collector 共用相同憑證）。
+負責處理專案執行狀態的自動化推播通知。
+透過 LINE Messaging API 的 Push Message 端點，即時回報爬蟲或排程任務的成功與失敗狀態。
+本模組採用動態取得短期 Access Token 的機制（使用 Channel ID 與 Channel Secret），無需維護長期 Token。
 
-需要設定環境變數：
-  - LINE_CHANNEL_ID: LINE Channel ID
-  - LINE_CHANNEL_SECRET: LINE Channel Secret
-  - LINE_USER_ID: 接收通知的使用者 ID
+前置作業（環境變數設定）：
+  - LINE_CHANNEL_ID: LINE 官方帳號的 Channel ID
+  - LINE_CHANNEL_SECRET: LINE 官方帳號的 Channel Secret
+  - LINE_USER_ID: 負責接收通知的目標使用者 ID
 """
 
 import logging
@@ -37,7 +38,13 @@ def _fmt_duration(secs: int) -> str:
 
 
 class LineNotifier:
-    """透過 LINE Messaging API 發送推播通知。"""
+    """
+    LINE 推播通知器。
+    
+    封裝 LINE Messaging API 的 OAuth 驗證機制與發送邏輯，提供發送文字訊息、
+    成功狀態報告與異常警報的高階方法。
+    若初始化時未明確指定憑證，將自動嘗試從環境變數載入。
+    """
 
     def __init__(
         self,
@@ -118,6 +125,19 @@ class LineNotifier:
         self, mode: str, stats: dict, duration_secs: int = 0, page_errors: int = 0,
         source: str = "Distiller",
     ) -> bool:
+        """
+        發送執行成功的狀態報告通知。
+        
+        Args:
+            mode: 執行的模式名稱（如 'full', 'incremental'）。
+            stats: 包含 '總記錄數' / '失敗 URL 數' / '類別分布' 等數據的統計字典。
+            duration_secs: 執行總耗時（秒）。若大於 0 將顯示於通知內。
+            page_errors: 執行過程中的頁面層級錯誤總數。
+            source: 資料來源或系統名稱（預設為 'Distiller'）。
+            
+        Returns:
+            bool: 發送成功回傳 True，發生錯誤或未設定憑證回傳 False。
+        """
         total = stats.get("總記錄數", stats.get("total_records", "?"))
         failed = stats.get("失敗 URL 數", stats.get("failed_urls", "?"))
         categories = stats.get("類別分布", stats.get("category_distribution", {}))
@@ -167,6 +187,20 @@ class LineNotifier:
         duration_secs: int = 0,
         source: str = "Distiller",
     ) -> bool:
+        """
+        發送執行失敗或發生異常的警報通知。
+        
+        Args:
+            mode: 執行的模式名稱（如 'full', 'incremental'）。
+            error: 主要錯誤訊息或例外狀況的簡要說明。
+            page_errors: 執行過程中的頁面層級錯誤總數。
+            error_details: 詳細的錯誤堆疊 (Traceback) 或附加的診斷資訊。
+            duration_secs: 任務中斷前的已執行耗時（秒）。
+            source: 資料來源或系統名稱（預設為 'Distiller'）。
+            
+        Returns:
+            bool: 發送成功回傳 True，發生錯誤或未設定憑證回傳 False。
+        """
         lines: list[str] = [
             f"❌ 【{source} 執行發生異常】",
             _SEP,
