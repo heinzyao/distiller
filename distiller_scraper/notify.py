@@ -122,22 +122,22 @@ class LineNotifier:
         failed = stats.get("失敗 URL 數", stats.get("failed_urls", "?"))
         categories = stats.get("類別分布", stats.get("category_distribution", {}))
         lines = [
-            f"✅ 【{source} 數據更新成功】",
+            f"✅ 【{source} 資料更新完成】",
             _SEP,
-            f"📅 時間：{self._timestamp()}",
-            f"⚙️ 模式：{mode.upper()}",
+            f"🕒 結束時間：{self._timestamp()}",
+            f"⚙️ 執行模式：{mode.upper()}",
         ]
         if duration_secs > 0:
-            lines.append(f"⏱ 耗時：{_fmt_duration(duration_secs)}")
+            lines.append(f"⏱ 總計耗時：{_fmt_duration(duration_secs)}")
         
         lines.extend([
             "",
-            "📈 執行數據",
-            f"  • 總記錄數：{total}",
-            f"  • 失敗連結：{failed}",
+            "📊 執行結果",
+            f"  • 總計記錄：{total} 筆",
+            f"  • 失敗連結：{failed} 筆",
         ])
         if page_errors > 0:
-            lines.append(f"  • 頁面錯誤：{page_errors}")
+            lines.append(f"  • 頁面錯誤：{page_errors} 筆")
 
         if categories:
             cat_total = (
@@ -146,15 +146,15 @@ class LineNotifier:
                 else 0
             )
             lines.append("")
-            lines.append("📊 類別分布")
+            lines.append("📂 資料類別分布")
             lines.append(_SEP_LIGHT)
             for k, v in categories.items():
                 if cat_total > 0 and isinstance(v, (int, float)):
                     bar_len = round(v / cat_total * 10)
                     bar = "█" * bar_len + "░" * (10 - bar_len)
-                    lines.append(f"  {k:<10} {bar} {v}")
+                    lines.append(f"  {k:<10} {bar} {v} 筆")
                 else:
-                    lines.append(f"  {k:<10} {v}")
+                    lines.append(f"  {k:<10} {v} 筆")
 
         return self.send("\n".join(lines))
 
@@ -168,25 +168,25 @@ class LineNotifier:
         source: str = "Distiller",
     ) -> bool:
         lines: list[str] = [
-            f"❌ 【{source} 執行異常中斷】",
+            f"❌ 【{source} 執行發生異常】",
             _SEP,
-            f"📅 時間：{self._timestamp()}",
-            f"⚙️ 模式：{mode.upper()}",
+            f"🕒 中斷時間：{self._timestamp()}",
+            f"⚙️ 執行模式：{mode.upper()}",
         ]
         if duration_secs > 0:
-            lines.append(f"⏱ 耗時：{_fmt_duration(duration_secs)}")
+            lines.append(f"⏱ 中斷前耗時：{_fmt_duration(duration_secs)}")
         
         lines.extend([
             "",
             "⚠️ 錯誤原因",
-            f"  {error or '未知錯誤，請查看系統日誌。'}",
+            f"  {error or '未知錯誤，請檢查系統日誌。'}",
         ])
         if page_errors > 0:
-            lines.append(f"  頁面錯誤數：{page_errors}")
+            lines.append(f"  • 頁面錯誤數：{page_errors} 筆")
         
         if error_details:
             lines.append("")
-            lines.append("📋 異常詳情")
+            lines.append("📋 錯誤詳情")
             lines.append(_SEP_LIGHT)
             lines.append(error_details)
         return self.send("\n".join(lines))
