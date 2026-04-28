@@ -180,6 +180,14 @@ docker build \
 docker push "gcr.io/${PROJECT_ID}/distiller-bot:latest"
 echo "  ✅ distiller-bot 已推送"
 
+echo "  🔨 建置 Difford's Guide 爬蟲容器…"
+docker build \
+  -f Dockerfile.diffords \
+  -t "gcr.io/${PROJECT_ID}/distiller-diffords:latest" \
+  .
+docker push "gcr.io/${PROJECT_ID}/distiller-diffords:latest"
+echo "  ✅ distiller-diffords 已推送"
+
 # ── Step 6: 部署 Cloud Run Job（爬蟲）────────────────────────────────────────
 
 echo ""
@@ -233,26 +241,77 @@ if [[ -z "$BOT_URL" ]]; then
 fi
 echo "  ✅ Bot 已部署：$BOT_URL"
 
-# ── Step 8: 設定 Cloud Scheduler（每日 10:00 台北時間）────────────────────────
+# ── Step 8: 部署 Cloud Run Job（Difford's Guide 爬蟲）────────────────────────
 
 echo ""
-echo "▶ Step 8: 設定 Cloud Scheduler…"
+echo "▶ Step 8: 部署 Cloud Run Job (distiller-diffords)…"
 
-JOBS_API_URI="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/distiller-scraper:run"
+if gcloud run jobs describe distiller-diffords \
+     --region="$REGION" --project="$PROJECT_ID" &>/dev/null; then
+  gcloud run jobs update distiller-diffords \
+    --image "gcr.io/${PROJECT_ID}/distiller-diffords:latest" \
+    --region="$REGION" \
+    --project="$PROJECT_ID"
+  echo "  ✅ Cloud Run Job 已更新"
+else
+  gcloud run jobs create distiller-diffords \
+    --image "gcr.io/${PROJECT_ID}/distiller-diffords:latest" \
+    --region="$REGION" \
+    --memory 512Mi \
+    --cpu 1 \
+    --task-timeout 3600 \
+    --set-env-vars "GCS_BUCKET=${BUCKET_NAME},GCS_DB_BLOB=diffords.db" \
+    --set-secrets "$_secret_flags" \
+    --project="$PROJECT_ID"
+  echo "  ✅ Cloud Run Job 已建立"
+fi
 
+# ── Step 9: 設定 Cloud Scheduler（每週排程）──────────────────────────────────
+
+echo ""
+echo "▶ Step 9: 設定 Cloud Scheduler…"
+
+SCRAPER_API_URI="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/distiller-scraper:run"
+DIFFORDS_API_URI="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/distiller-diffords:run"
+
+# 移除舊有每日排程（如存在）
 if gcloud scheduler jobs describe distiller-daily-scrape \
      --location="$REGION" --project="$PROJECT_ID" &>/dev/null; then
-  echo "  ℹ️  Scheduler 已存在，跳過建立"
+  gcloud scheduler jobs delete distiller-daily-scrape \
+    --location="$REGION" --project="$PROJECT_ID" --quiet
+  echo "  🗑️  舊的 distiller-daily-scrape 已刪除"
+fi
+
+# distiller-scraper：每週一 02:00 台北時間
+if gcloud scheduler jobs describe distiller-weekly-scrape \
+     --location="$REGION" --project="$PROJECT_ID" &>/dev/null; then
+  echo "  ℹ️  distiller-weekly-scrape 已存在，跳過建立"
 else
-  gcloud scheduler jobs create http distiller-daily-scrape \
-    --schedule "0 2 * * *" \
+  gcloud scheduler jobs create http distiller-weekly-scrape \
+    --schedule "0 2 * * 1" \
     --time-zone "Asia/Taipei" \
-    --uri "$JOBS_API_URI" \
+    --uri "$SCRAPER_API_URI" \
     --http-method POST \
     --oauth-service-account-email "${SA_EMAIL}" \
     --location="$REGION" \
     --project="$PROJECT_ID"
-  echo "  ✅ Scheduler 已建立（每日 UTC 02:00 = 台北 10:00）"
+  echo "  ✅ distiller-weekly-scrape 已建立（每週一 02:00 台北時間）"
+fi
+
+# distiller-diffords：每週日 03:00 台北時間
+if gcloud scheduler jobs describe distiller-weekly-diffords \
+     --location="$REGION" --project="$PROJECT_ID" &>/dev/null; then
+  echo "  ℹ️  distiller-weekly-diffords 已存在，跳過建立"
+else
+  gcloud scheduler jobs create http distiller-weekly-diffords \
+    --schedule "0 3 * * 0" \
+    --time-zone "Asia/Taipei" \
+    --uri "$DIFFORDS_API_URI" \
+    --http-method POST \
+    --oauth-service-account-email "${SA_EMAIL}" \
+    --location="$REGION" \
+    --project="$PROJECT_ID"
+  echo "  ✅ distiller-weekly-diffords 已建立（每週日 03:00 台北時間）"
 fi
 
 # ── 完成摘要 ──────────────────────────────────────────────────────────────────
@@ -275,6 +334,10 @@ echo "     curl ${BOT_URL}/health"
 echo ""
 echo "  3. 手動觸發爬蟲（驗證）："
 echo "     gcloud run jobs execute distiller-scraper \\"
+echo "       --region $REGION --project $PROJECT_ID"
+echo ""
+echo "  3b. 手動觸發 Difford's Guide 爬蟲（驗證）："
+echo "     gcloud run jobs execute distiller-diffords \\"
 echo "       --region $REGION --project $PROJECT_ID"
 echo ""
 echo "  4. 設定 GitHub Actions Secrets（CI/CD 用）："
