@@ -73,7 +73,7 @@ jobs:
 
       - name: Deploy bot service
         run: |
-          gcloud run deploy distiller-bot \
+          gcloud run deploy diffords-cocktails-bot \
             --image gcr.io/$PROJECT_ID/diffords-cocktails-bot:$GITHUB_SHA \
             --region $REGION \
             --memory 512Mi \

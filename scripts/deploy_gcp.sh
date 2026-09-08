@@ -37,7 +37,7 @@ gcloud run jobs update diffords-cocktails-scraper \
     --set-env-vars "GCS_BUCKET=${BUCKET_NAME},GCS_DB_BLOB=diffords.db" \
     --set-secrets "LINE_CHANNEL_ID=DISTILLER_LINE_CHANNEL_ID:latest,LINE_CHANNEL_SECRET=DISTILLER_LINE_CHANNEL_SECRET:latest,LINE_USER_ID=DISTILLER_LINE_USER_ID:latest"
 
-gcloud run deploy distiller-bot \
+gcloud run deploy diffords-cocktails-bot \
   --image "gcr.io/${PROJECT_ID}/diffords-cocktails-bot:latest" \
   --region "$REGION" \
   --memory 512Mi \

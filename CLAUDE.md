@@ -44,6 +44,23 @@ Two deployables, one shared package (`diffords_guide/`) and DB (`diffords.db`):
 ### Bot → scraper trigger
 `bot._start_diffords()` runs the scraper **only** when both `GCS_BUCKET` and `GOOGLE_CLOUD_PROJECT` are set, via `run_v2.JobsClient().run_job()` against `DIFFORDS_JOB_NAME`; otherwise it's a no-op path. Command parsing lives in `parse_command()` / `handle_message()`; the `雞尾酒*` Chinese commands and their `fmt_*` formatters are the bot's public surface — see README for the full command table.
 
+## Deployment and scheduling
+
+Two Cloud Run resources, one bucket:
+
+- Service `diffords-cocktails-bot` — the LINE bot. Deployed by `.github/workflows/deploy.yml` on push to main.
+- Job `diffords-cocktails-scraper` — the scraper. Also deployed by the same workflow; triggered on demand by the bot (`DIFFORDS_JOB_NAME`).
+- Bucket `diffords-cocktails-data` holds `diffords.db`, the source of truth in prod.
+
+**Scheduled scraping runs on the local Mac, not in the cloud.** `~/Library/LaunchAgents/com.distiller.diffords.plist`
+runs `scripts/run_diffords.sh` every Sunday at 04:00, which writes to `diffords-cocktails-data`.
+This is deliberate — Cloud Scheduler was tried and removed (2026-09-08). Don't add cloud
+scheduling back without deciding what to do about the local job first; running both would
+have two writers on one SQLite blob.
+
+Consequence: if the Mac is off on Sunday, that week's update is skipped. Catch up by
+running the scraper manually, or trigger the Cloud Run job from the bot's LINE command.
+
 ## Conventions
 
 - Config is module-level constants in `config.py` (deliberately not a class — scrape params are immutable at runtime).
