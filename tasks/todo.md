@@ -49,6 +49,8 @@
 - [x] `diffords-cocktails-bot` 部署出 rev 00002，`/health` 回 200
 - [x] 刪除 `distiller-bot`（刪除前為 rev 00039，image tag `4c51ba0`）
 - [x] 刪除 `gs://distiller-data/distiller.db`（4.98 MiB 舊烈酒評論資料庫）
+- [x] 刪除 `gs://distiller-data` bucket
+- [x] `deploy.yml` 加上 `paths-ignore`，純文件 commit 不再觸發部署
 
 ## 收斂後現況
 
@@ -59,9 +61,7 @@
 | GCS bucket | `diffords-cocktails-data`（`diffords.db` 為正本） |
 | 排程 | 本機 launchd `com.distiller.diffords`，每週日 04:00 |
 
-`distiller` 命名的雲端資源已全數移除。唯一殘留是 `gs://distiller-data`
-bucket 本身，內含一份 2026-04-13 的過期 `diffords.db`（48 KiB），
-確認無用後可整個刪除。
+`distiller` 命名的雲端資源已全數移除，包含 `gs://distiller-data` bucket。
 
 ## Review
 

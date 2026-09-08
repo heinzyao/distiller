@@ -3,6 +3,12 @@ name: Deploy to Cloud Run
 on:
   push:
     branches: [main]
+    # 純文件的 commit 不需要重建 image 並重新部署
+    paths-ignore:
+      - '**.md'
+      - 'tasks/**'
+      - '.gitignore'
+      - 'LICENSE'
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
