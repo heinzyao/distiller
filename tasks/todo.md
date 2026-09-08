@@ -37,28 +37,34 @@
 - [x] `CLAUDE.md` 新增 Deployment and scheduling 段落，寫明排程刻意放在本機
 - [x] 提交 `deploy.yml` / `scripts/deploy_gcp.sh` 的服務改名
 
-## 待辦（需人工介入，有先後順序）
+## 待辦
 
-- [ ] push 到 main，讓 CI 部署出 `diffords-cocktails-bot` 的新 revision
-- [ ] **在 LINE Developers Console 把 webhook 改成新服務的 `/webhook`**
-      —— 這步之前，流量仍由 `distiller-bot` 承接，改了 CI 也沒用
-- [ ] 驗證 bot 指令正常
-- [ ] 刪除 `distiller-bot` 服務
+無。收斂已完成。
 
-## 未處理：`gs://distiller-data`
+## 執行紀錄（2026-09-08 後續）
 
-原本列為「確認無其他用途後刪除」，查證後**發現不只一個檔案**，因此保留：
+- [x] push 到 main（`4c51ba0..c5f06fd`），Tests 與 Deploy to Cloud Run 皆綠燈
+      —— 順帶驗證升級後的 `auth@v3` / `setup-gcloud@v3` 在 WIF 流程下正常
+- [x] LINE webhook 已由使用者切至新服務
+- [x] `diffords-cocktails-bot` 部署出 rev 00002，`/health` 回 200
+- [x] 刪除 `distiller-bot`（刪除前為 rev 00039，image tag `4c51ba0`）
+- [x] 刪除 `gs://distiller-data/distiller.db`（4.98 MiB 舊烈酒評論資料庫）
 
-| 物件 | 大小 | 最後更新 |
-|---|---|---|
-| `diffords.db` | 48 KiB | 2026-04-13 |
-| `distiller.db` | 4.98 MiB | 2026-05-17 |
+## 收斂後現況
 
-`distiller.db` 是舊的烈酒評論資料庫。`CLAUDE.md` 寫明烈酒評論爬蟲已不在專案
-範圍內，但資料本身是否要留作封存沒有記錄。**在決定之前不要刪這個 bucket。**
+| 類型 | 名稱 |
+|---|---|
+| Cloud Run service | `diffords-cocktails-bot` |
+| Cloud Run job | `diffords-cocktails-scraper` |
+| GCS bucket | `diffords-cocktails-data`（`diffords.db` 為正本） |
+| 排程 | 本機 launchd `com.distiller.diffords`，每週日 04:00 |
+
+`distiller` 命名的雲端資源已全數移除。唯一殘留是 `gs://distiller-data`
+bucket 本身，內含一份 2026-04-13 的過期 `diffords.db`（48 KiB），
+確認無用後可整個刪除。
 
 ## Review
 
-雲端殘留資源已清乾淨，Cloud Run 現在只剩 `diffords-cocktails-scraper` 一個 job。
-服務改名的 commit 已備妥但未 push —— push 會觸發真正的 Cloud Run 部署，且必須
-搭配 LINE webhook 的手動切換才算完成。
+三項決定全部落地，雲端只剩一個 service、一個 job、一個 bucket 在用。
+排程刻意留在本機，已寫入 `CLAUDE.md` 的 Deployment and scheduling 段落，
+並註明不要在未處理本機排程前加回雲端排程。
